@@ -1,7 +1,10 @@
+import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { getStore, STORAGE_KEYS } from '@/lib/storage';
 import type { Patient, PatientTreatment, Invoice } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import DentalChart2D from '@/components/DentalChart/DentalChart2D';
+import type { ChartStatusFilter } from '@/components/DentalChart/constants';
 
 export default function SharePatientView() {
   const { token } = useParams<{ token: string }>();
@@ -31,6 +34,21 @@ export default function SharePatientView() {
     ? Math.floor((Date.now() - new Date(patient.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     : new Date().getFullYear() - patient.birthYear;
 
+  const [chartTab, setChartTab] = useState<ChartStatusFilter>('planned');
+  const getToothTreatments = (toothNum: number) =>
+    treatments.filter((t) => t.toothNumber === toothNum && t.status === chartTab);
+  const getToothColor = (toothNum: number) => {
+    const tt = getToothTreatments(toothNum);
+    if (tt.length === 0) return 'fill-muted stroke-border';
+    if (chartTab === 'planned') return 'fill-primary/30 stroke-primary';
+    if (chartTab === 'in_progress') return 'fill-amber-500/40 stroke-amber-600';
+    return 'fill-emerald-500/40 stroke-emerald-600';
+  };
+  const jawOnlyTreatments = useMemo(
+    () => treatments.filter((t) => !t.toothNumber && (t.jaw === 'upper' || t.jaw === 'lower' || t.jaw === 'both')),
+    [treatments]
+  );
+
   return (
     <div className="min-h-screen bg-muted/30 p-4 md:p-8" dir="rtl">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -58,6 +76,31 @@ export default function SharePatientView() {
             </div>
           )}
         </div>
+
+        {/* مخطط الأسنان (قراءة فقط) */}
+        {treatments.length > 0 && (
+          <div className="bg-card rounded-xl border border-border p-4">
+            <h2 className="font-semibold mb-3">مخطط الأسنان</h2>
+            <div className="flex gap-1 mb-3">
+              {(['planned', 'in_progress', 'completed'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setChartTab(s)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${chartTab === s ? 'bg-muted' : 'text-muted-foreground'}`}
+                >
+                  {s === 'planned' ? 'مخطط' : s === 'in_progress' ? 'جاري العمل' : 'مكتمل'}
+                </button>
+              ))}
+            </div>
+            <DentalChart2D
+              treatments={treatments}
+              statusFilter={chartTab}
+              getToothColor={getToothColor}
+              jawOnlyTreatments={jawOnlyTreatments}
+            />
+          </div>
+        )}
 
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <h2 className="font-semibold p-4 border-b border-border">العلاجات</h2>

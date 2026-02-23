@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getStore, setStore, generateId, getNextInvoiceNo, getNextReceiptNo, formatInvoiceNo, formatReceiptNo, STORAGE_KEYS } from '@/lib/storage';
 import type { Patient, PatientTreatment, TreatmentGroup, Doctor, Invoice, Payment, Prescription, PatientFile, Appointment } from '@/types';
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Play, CheckCircle, FileText, Upload, Printer, ArrowRight, Share2 } from 'lucide-react';
+import DentalChart2D from '@/components/DentalChart/DentalChart2D';
 import { format } from 'date-fns';
 
 export default function PatientProfile() {
@@ -241,17 +242,24 @@ export default function PatientProfile() {
     paid: 'bg-success text-success-foreground',
   };
 
-  // Dental chart teeth
-  const upperTeeth = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
-  const lowerTeeth = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
-
   const getToothTreatments = (toothNum: number) => treatments.filter(t => t.toothNumber === toothNum && t.status === chartTab);
+  /** SVG fill/stroke classes for 2D dental chart. */
   const getToothColor = (toothNum: number) => {
     const tt = getToothTreatments(toothNum);
-    if (tt.length === 0) return 'bg-muted text-muted-foreground';
-    if (chartTab === 'planned') return 'bg-info/20 text-info border-info';
-    if (chartTab === 'in_progress') return 'bg-warning/20 text-warning border-warning';
-    return 'bg-success/20 text-success border-success';
+    if (tt.length === 0) return 'fill-muted stroke-border';
+    if (chartTab === 'planned') return 'fill-primary/30 stroke-primary';
+    if (chartTab === 'in_progress') return 'fill-amber-500/40 stroke-amber-600';
+    return 'fill-emerald-500/40 stroke-emerald-600';
+  };
+
+  const jawOnlyTreatments = treatments.filter(t => !t.toothNumber && (t.jaw === 'upper' || t.jaw === 'lower' || t.jaw === 'both'));
+  const treatmentListRef = useRef<HTMLTableSectionElement>(null);
+  const [highlightTooth, setHighlightTooth] = useState<number | null>(null);
+
+  const handleToothClick = (toothNumber: number) => {
+    setHighlightTooth(toothNumber);
+    const firstRow = treatmentListRef.current?.querySelector(`tr[data-tooth="${toothNumber}"]`);
+    firstRow?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
   const unpaidInvoices = invoices.filter(i => i.status !== 'paid');
@@ -339,28 +347,15 @@ export default function PatientProfile() {
             </Button>
           </div>
 
-          {/* Dental Chart Visual */}
-          <div className="bg-card rounded-xl border border-border p-6">
-            <p className="text-center text-sm text-muted-foreground mb-4">الفك العلوي</p>
-            <div className="flex justify-center gap-1 flex-wrap mb-6">
-              {upperTeeth.map(t => (
-                <div key={t} className={`w-10 h-12 rounded-lg border-2 flex flex-col items-center justify-center text-xs cursor-pointer transition-all hover:scale-110 ${getToothColor(t)}`}>
-                  <span className="font-bold">{t}</span>
-                  {getToothTreatments(t).length > 0 && <span className="text-[10px]">{getToothTreatments(t).length}</span>}
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-dashed border-border my-2" />
-            <div className="flex justify-center gap-1 flex-wrap mt-6">
-              {lowerTeeth.map(t => (
-                <div key={t} className={`w-10 h-12 rounded-lg border-2 flex flex-col items-center justify-center text-xs cursor-pointer transition-all hover:scale-110 ${getToothColor(t)}`}>
-                  <span className="font-bold">{t}</span>
-                  {getToothTreatments(t).length > 0 && <span className="text-[10px]">{getToothTreatments(t).length}</span>}
-                </div>
-              ))}
-            </div>
-            <p className="text-center text-sm text-muted-foreground mt-4">الفك السفلي</p>
-          </div>
+          {/* Dental Chart Visual — mouth-shaped 2D */}
+          <DentalChart2D
+            treatments={treatments}
+            statusFilter={chartTab}
+            getToothColor={getToothColor}
+            onToothClick={handleToothClick}
+            highlightTooth={highlightTooth}
+            jawOnlyTreatments={jawOnlyTreatments}
+          />
 
           {/* Treatment List */}
           <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -374,9 +369,9 @@ export default function PatientProfile() {
                   <th className="text-start p-3 font-medium">إجراء</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={treatmentListRef}>
                 {treatments.filter(t => t.status === chartTab).map(t => (
-                  <tr key={t.id} className="border-b border-border">
+                  <tr key={t.id} className="border-b border-border" data-tooth={t.toothNumber ?? undefined}>
                     <td className="p-3 font-medium">{t.treatmentName}</td>
                     <td className="p-3">{t.toothNumber || (t.jaw === 'upper' ? 'علوي' : t.jaw === 'lower' ? 'سفلي' : t.jaw === 'both' ? 'فكين' : '-')}</td>
                     <td className="p-3">{getDoctorName(t.doctorId)}</td>
