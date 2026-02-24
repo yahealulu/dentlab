@@ -199,7 +199,7 @@ export default function PatientsList() {
               <th className="text-start p-3 font-medium">المريض</th>
               <th className="text-start p-3 font-medium">الهاتف</th>
               <th className="text-start p-3 font-medium">العنوان</th>
-              <th className="text-start p-3 font-medium">علامة</th>
+              <th className="text-start p-3 font-medium">الوسوم</th>
               <th className="text-start p-3 font-medium">مسجل بواسطة</th>
               <th className="text-start p-3 font-medium">إجراءات</th>
             </tr>
@@ -209,14 +209,17 @@ export default function PatientsList() {
               <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">لا يوجد مرضى</td></tr>
             ) : filtered.map(p => (
               <tr key={p.id} className="border-b border-border hover:bg-muted/30">
-                <td className="p-3 text-muted-foreground">{p.fileNo}</td>
+                <td className="p-3 text-muted-foreground font-mono">p_{String(p.fileNo).padStart(5, '0')}</td>
                 <td className="p-3">
                   <Link to={`/patients/${p.id}`} className="text-primary hover:underline font-medium">{p.fullName}</Link>
-                  {p.tags.map(t => <Badge key={t} variant="secondary" className="mr-1 text-xs">#{t}</Badge>)}
                 </td>
                 <td className="p-3" dir="ltr">{p.countryCode} {p.phone}</td>
                 <td className="p-3 text-muted-foreground">{p.address}</td>
-                <td className="p-3">{p.distinctMark}</td>
+                <td className="p-3">
+                  <div className="flex flex-wrap gap-1">
+                    {p.tags.length ? p.tags.map(t => <Badge key={t} variant="secondary" className="text-xs">#{t}</Badge>) : <span className="text-muted-foreground">—</span>}
+                  </div>
+                </td>
                 <td className="p-3 text-muted-foreground">{p.createdBy}</td>
                 <td className="p-3 flex gap-1">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="w-4 h-4" /></Button>
