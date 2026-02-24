@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { getStore, setStore, generateId, STORAGE_KEYS } from '@/lib/storage';
 import type { Appointment, Doctor, Patient, ClinicSettings, TreatmentGroup, WorkShift } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,21 @@ const statusLabels: Record<string, string> = {
 export default function AppointmentsPage() {
   const settings = getStore<ClinicSettings>(STORAGE_KEYS.clinicSettings, { workDays: [0,1,2,3,4], startTime: '09:00', endTime: '17:00', shifts: [{ id: 'default', startTime: '09:00', endTime: '17:00' }], holidays: [], logo: null, tags: [], slotDuration: 30 });
   const [appointments, setAppointments] = useState<Appointment[]>(() => getStore(STORAGE_KEYS.appointments, []));
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEYS.appointments && e.newValue) {
+        try {
+          setAppointments(JSON.parse(e.newValue));
+        } catch {
+          setAppointments(getStore(STORAGE_KEYS.appointments, []));
+        }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const doctors = getStore<Doctor[]>(STORAGE_KEYS.doctors, []);
   const patients = getStore<Patient[]>(STORAGE_KEYS.patients, []);
   const groups = getStore<TreatmentGroup[]>(STORAGE_KEYS.treatmentGroups, []);

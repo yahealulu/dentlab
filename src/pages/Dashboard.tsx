@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { getStore, STORAGE_KEYS } from '@/lib/storage';
+import { getStore, setStore, STORAGE_KEYS } from '@/lib/storage';
 import type { Appointment, Patient, Doctor, Expense, LabOrder } from '@/types';
-import { Calendar, Users, DollarSign, FlaskConical, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Calendar, Users, DollarSign, FlaskConical, ChevronLeft, ChevronRight, Filter, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { format, addDays, subDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 const statusMap: Record<string, { label: string; class: string }> = {
   scheduled: { label: 'مجدول', class: 'bg-info text-info-foreground' },
@@ -23,6 +24,9 @@ const nextStatus: Record<string, string> = {
   in_progress: 'completed',
 };
 
+/** Cancel allowed only for scheduled and waiting — not for in_progress, completed, or cancelled */
+const canCancel = (status: string) => status === 'scheduled' || status === 'waiting';
+
 function formatTimeRange(time: string, durationMinutes: number): string {
   const [h, m] = time.split(':').map(Number);
   const totalM = h * 60 + m + (durationMinutes || 30);
@@ -35,12 +39,30 @@ function formatTimeRange(time: string, durationMinutes: number): string {
 export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [filterDoctor, setFilterDoctor] = useState('all');
+  const [appointments, setAppointments] = useState<Appointment[]>(() => getStore<Appointment[]>(STORAGE_KEYS.appointments, []));
 
-  const appointments = getStore<Appointment[]>(STORAGE_KEYS.appointments, []);
   const patients = getStore<Patient[]>(STORAGE_KEYS.patients, []);
   const doctors = getStore<Doctor[]>(STORAGE_KEYS.doctors, []);
   const expenses = getStore<Expense[]>(STORAGE_KEYS.expenses, []);
   const labOrders = getStore<LabOrder[]>(STORAGE_KEYS.labOrders, []);
+
+  const syncAppointmentsFromStorage = useCallback(() => {
+    setAppointments(getStore<Appointment[]>(STORAGE_KEYS.appointments, []));
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEYS.appointments && e.newValue) {
+        try {
+          setAppointments(JSON.parse(e.newValue));
+        } catch {
+          syncAppointmentsFromStorage();
+        }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [syncAppointmentsFromStorage]);
 
   const todayAppointments = useMemo(() => {
     let filtered = appointments.filter(a => a.date === selectedDate);
@@ -61,16 +83,34 @@ export default function Dashboard() {
   };
   const getDoctorName = (id: string) => doctors.find(d => d.id === id)?.name || '-';
 
+  const persistAppointments = useCallback((updated: Appointment[]) => {
+    setStore(STORAGE_KEYS.appointments, updated);
+    setAppointments(updated);
+  }, []);
+
   const handleStatusChange = (appointmentId: string) => {
-    const all = getStore<Appointment[]>(STORAGE_KEYS.appointments, []);
-    const updated = all.map(a => {
-      if (a.id === appointmentId && nextStatus[a.status]) {
-        return { ...a, status: nextStatus[a.status] as Appointment['status'] };
-      }
-      return a;
+    setAppointments(prev => {
+      const updated = prev.map(a => {
+        if (a.id === appointmentId && nextStatus[a.status]) {
+          return { ...a, status: nextStatus[a.status] as Appointment['status'] };
+        }
+        return a;
+      });
+      setStore(STORAGE_KEYS.appointments, updated);
+      toast.success('تم تحديث حالة الموعد');
+      return updated;
     });
-    localStorage.setItem(STORAGE_KEYS.appointments, JSON.stringify(updated));
-    window.location.reload();
+  };
+
+  const handleCancel = (appointmentId: string) => {
+    setAppointments(prev => {
+      const updated = prev.map(a =>
+        a.id === appointmentId ? { ...a, status: 'cancelled' as const } : a
+      );
+      setStore(STORAGE_KEYS.appointments, updated);
+      toast.success('تم إلغاء الموعد');
+      return updated;
+    });
   };
 
   const stats = [
@@ -174,11 +214,19 @@ export default function Dashboard() {
                       <Badge className={statusMap[apt.status]?.class}>{statusMap[apt.status]?.label}</Badge>
                     </td>
                     <td className="p-3">
-                      {nextStatus[apt.status] && (
-                        <Button size="sm" variant="outline" onClick={() => handleStatusChange(apt.id)}>
-                          {statusMap[nextStatus[apt.status]]?.label} ←
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {nextStatus[apt.status] && (
+                          <Button size="sm" variant="outline" onClick={() => handleStatusChange(apt.id)}>
+                            {statusMap[nextStatus[apt.status]]?.label} ←
+                          </Button>
+                        )}
+                        {canCancel(apt.status) && (
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/50 hover:bg-destructive/10" onClick={() => handleCancel(apt.id)}>
+                            <XCircle className="w-4 h-4 ms-1" />
+                            إلغاء
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
