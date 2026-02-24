@@ -303,7 +303,7 @@ export default function PatientProfile() {
 
       {/* Tabs */}
       <Tabs defaultValue="dental-chart" className="space-y-4">
-        <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1 rounded-xl">
+        <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1 rounded-xl flex-row-reverse">
           <TabsTrigger value="personal">المعلومات</TabsTrigger>
           <TabsTrigger value="dental-chart">مخطط الأسنان</TabsTrigger>
           <TabsTrigger value="appointments">المواعيد</TabsTrigger>
@@ -331,8 +331,8 @@ export default function PatientProfile() {
 
         {/* Tab 2: Dental Chart */}
         <TabsContent value="dental-chart" className="space-y-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <div className="flex flex-row-reverse gap-1 bg-muted/50 p-1 rounded-lg">
               {(['planned', 'in_progress', 'completed'] as const).map(s => (
                 <button key={s} onClick={() => setChartTab(s)} className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${chartTab === s ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>
                   {s === 'planned' ? 'مخطط' : s === 'in_progress' ? 'جاري العمل' : 'مكتمل'}
