@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Play, CheckCircle, FileText, Upload, Printer, ArrowRight, Share2 } from 'lucide-react';
-import DentalChart2D from '@/components/DentalChart/DentalChart2D';
+import DentalChartCircular from '@/components/DentalChart/DentalChartCircular';
 import { format } from 'date-fns';
 
 export default function PatientProfile() {
@@ -348,7 +348,7 @@ export default function PatientProfile() {
           </div>
 
           {/* Dental Chart Visual — mouth-shaped 2D */}
-          <DentalChart2D
+          <DentalChartCircular
             treatments={treatments}
             statusFilter={chartTab}
             getToothColor={getToothColor}

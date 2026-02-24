@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getStore, STORAGE_KEYS } from '@/lib/storage';
 import type { Patient, PatientTreatment, Invoice } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import DentalChart2D from '@/components/DentalChart/DentalChart2D';
+import DentalChartCircular from '@/components/DentalChart/DentalChartCircular';
 import type { ChartStatusFilter } from '@/components/DentalChart/constants';
 
 export default function SharePatientView() {
@@ -93,7 +93,7 @@ export default function SharePatientView() {
                 </button>
               ))}
             </div>
-            <DentalChart2D
+            <DentalChartCircular
               treatments={treatments}
               statusFilter={chartTab}
               getToothColor={getToothColor}
