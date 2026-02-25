@@ -13,7 +13,14 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Play, CheckCircle, FileText, Upload, Printer, ArrowRight, Share2 } from 'lucide-react';
 import DentalChartCircular from '@/components/DentalChart/DentalChartCircular';
+import { ALL_TEETH } from '@/components/DentalChart/constants';
 import { format } from 'date-fns';
+
+const VALID_TOOTH_SET = new Set(ALL_TEETH);
+const isValidToothNumber = (value: string): boolean => {
+  const num = parseInt(value, 10);
+  return !isNaN(num) && VALID_TOOTH_SET.has(num);
+};
 
 export default function PatientProfile() {
   const { id } = useParams<{ id: string }>();
@@ -93,7 +100,17 @@ export default function PatientProfile() {
     const group = groups.find(g => g.id === treatmentForm.groupId)!;
     const treatment = group.treatments.find(t => t.id === treatmentForm.treatmentId)!;
     const isDynamic = group.effect === 'dynamic';
-    const toothNumber = (group.effect === 'tooth' || (isDynamic && treatmentForm.effectType === 'tooth')) && treatmentForm.toothNumber
+    const needsTooth = group.effect === 'tooth' || (isDynamic && treatmentForm.effectType === 'tooth');
+    if (needsTooth) {
+      if (!treatmentForm.toothNumber.trim()) {
+        toast.error('رقم السن مطلوب'); return;
+      }
+      if (!isValidToothNumber(treatmentForm.toothNumber)) {
+        toast.error('رقم السن غير صحيح. الأرقام المسموحة: 11-18، 21-28، 31-38، 41-48');
+        return;
+      }
+    }
+    const toothNumber = needsTooth && treatmentForm.toothNumber
       ? parseInt(treatmentForm.toothNumber) : null;
     const jaw = (group.effect === 'jaw' || group.effect === 'both_jaws' || (isDynamic && treatmentForm.effectType === 'jaw')) && treatmentForm.jaw
       ? (treatmentForm.jaw as 'upper' | 'lower' | 'both') : null;
@@ -629,7 +646,20 @@ export default function PatientProfile() {
                   </Select>
                 </div>
                 {treatmentForm.effectType === 'tooth' && (
-                  <div><Label>رقم السن</Label><Input type="number" value={treatmentForm.toothNumber} onChange={e => setTreatmentForm({ ...treatmentForm, toothNumber: e.target.value })} min={11} max={48} /></div>
+                  <div>
+                    <Label>رقم السن</Label>
+                    <Input
+                      type="number"
+                      value={treatmentForm.toothNumber}
+                      onChange={e => setTreatmentForm({ ...treatmentForm, toothNumber: e.target.value })}
+                      min={11}
+                      max={48}
+                      className={treatmentForm.toothNumber && !isValidToothNumber(treatmentForm.toothNumber) ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    />
+                    {treatmentForm.toothNumber && !isValidToothNumber(treatmentForm.toothNumber) && (
+                      <p className="text-destructive text-sm mt-1">رقم السن غير صحيح. المسموح: 11-18، 21-28، 31-38، 41-48</p>
+                    )}
+                  </div>
                 )}
                 {treatmentForm.effectType === 'jaw' && (
                   <div>
@@ -646,7 +676,20 @@ export default function PatientProfile() {
               </>
             )}
             {selectedGroup?.effect === 'tooth' && (
-              <div><Label>رقم السن</Label><Input type="number" value={treatmentForm.toothNumber} onChange={e => setTreatmentForm({ ...treatmentForm, toothNumber: e.target.value })} min={11} max={48} /></div>
+              <div>
+                <Label>رقم السن</Label>
+                <Input
+                  type="number"
+                  value={treatmentForm.toothNumber}
+                  onChange={e => setTreatmentForm({ ...treatmentForm, toothNumber: e.target.value })}
+                  min={11}
+                  max={48}
+                  className={treatmentForm.toothNumber && !isValidToothNumber(treatmentForm.toothNumber) ? 'border-destructive focus-visible:ring-destructive' : ''}
+                />
+                {treatmentForm.toothNumber && !isValidToothNumber(treatmentForm.toothNumber) && (
+                  <p className="text-destructive text-sm mt-1">رقم السن غير صحيح. المسموح: 11-18، 21-28، 31-38، 41-48</p>
+                )}
+              </div>
             )}
             {(selectedGroup?.effect === 'jaw' || selectedGroup?.effect === 'both_jaws') && (
               <div>
