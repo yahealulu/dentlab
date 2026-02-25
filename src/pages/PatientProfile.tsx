@@ -53,14 +53,16 @@ export default function PatientProfile() {
   const [prescriptionOpen, setPrescriptionOpen] = useState(false);
   const [fileUploadOpen, setFileUploadOpen] = useState(false);
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [completeTreatmentModalOpen, setCompleteTreatmentModalOpen] = useState(false);
+  const [completeTreatmentNotes, setCompleteTreatmentNotes] = useState('');
 
   // Forms
   const [treatmentForm, setTreatmentForm] = useState({ groupId: '', treatmentId: '', toothNumber: '', jaw: '', effectType: '' as '' | 'tooth' | 'jaw', doctorId: '', isOld: false });
-  const [invoiceForm, setInvoiceForm] = useState({ basePrice: 0, diagnosticFee: 0, discount: 0, discountType: 'fixed' as 'fixed' | 'percentage' });
+  const [invoiceForm, setInvoiceForm] = useState({ basePrice: 0, diagnosticFee: 0, discount: 0, discountType: 'fixed' as 'fixed' | 'percentage', firstSessionNotes: '' });
   const [paymentForm, setPaymentForm] = useState({ invoiceId: '', amount: 0, method: 'cash' as 'cash' | 'other', date: format(new Date(), 'yyyy-MM-dd'), notes: '' });
   const [prescForm, setPrescForm] = useState({ name: '', dosage: '', type: '', duration: 7, notes: '' });
   const [fileForm, setFileForm] = useState({ title: '', notes: '', fileData: '', fileType: 'file' as 'file' | 'xray' });
-  const [sessionForm, setSessionForm] = useState({ notes: '' });
+  const [sessionForm, setSessionForm] = useState({ date: format(new Date(), 'yyyy-MM-dd'), notes: '' });
   const [activeTreatmentId, setActiveTreatmentId] = useState<string | null>(null);
   const [chartTab, setChartTab] = useState<'planned' | 'in_progress' | 'completed'>('planned');
 
@@ -135,7 +137,7 @@ export default function PatientProfile() {
     if (!t) return;
     const group = groups.find(g => g.id === t.groupId);
     const treatmentItem = group?.treatments.find(x => x.id === t.treatmentId);
-    setInvoiceForm({ basePrice: treatmentItem?.price || 0, diagnosticFee: 0, discount: 0, discountType: 'fixed' });
+    setInvoiceForm({ basePrice: treatmentItem?.price || 0, diagnosticFee: 0, discount: 0, discountType: 'fixed', firstSessionNotes: '' });
     setActiveTreatmentId(treatmentId);
     setInvoiceModalOpen(true);
   };
@@ -157,25 +159,37 @@ export default function PatientProfile() {
       createdAt: new Date().toISOString(),
     };
     saveInvoices([...invoices, inv]);
-    saveTreatments(treatments.map(x => x.id === activeTreatmentId ? { ...x, status: 'in_progress' as const, invoiceId: inv.id } : x));
+    const firstSession = invoiceForm.firstSessionNotes.trim()
+      ? [{ id: generateId(), date: format(new Date(), 'yyyy-MM-dd'), notes: invoiceForm.firstSessionNotes.trim() }]
+      : [];
+    saveTreatments(treatments.map(x => x.id === activeTreatmentId ? { ...x, status: 'in_progress' as const, invoiceId: inv.id, sessions: firstSession } : x));
     setInvoiceModalOpen(false);
     toast.success('تم بدء العلاج وإنشاء الفاتورة');
   };
 
-  // Complete Treatment
-  const completeTreatment = (treatmentId: string) => {
-    saveTreatments(treatments.map(x => x.id === treatmentId ? { ...x, status: 'completed' as const } : x));
+  // Complete Treatment (called from modal with optional notes)
+  const completeTreatment = (treatmentId: string, notes?: string) => {
+    saveTreatments(treatments.map(x =>
+      x.id === treatmentId ? { ...x, status: 'completed' as const, completedNotes: notes ?? x.completedNotes } : x
+    ));
+    setCompleteTreatmentModalOpen(false);
+    setCompleteTreatmentNotes('');
     toast.success('تم إنهاء العلاج');
+  };
+
+  const confirmCompleteTreatment = () => {
+    if (!activeTreatmentId) return;
+    completeTreatment(activeTreatmentId, completeTreatmentNotes);
   };
 
   // Add Session
   const addSession = () => {
     if (!activeTreatmentId) return;
     saveTreatments(treatments.map(x => x.id === activeTreatmentId ? {
-      ...x, sessions: [...x.sessions, { id: generateId(), date: format(new Date(), 'yyyy-MM-dd'), notes: sessionForm.notes }],
+      ...x, sessions: [...x.sessions, { id: generateId(), date: sessionForm.date, notes: sessionForm.notes }],
     } : x));
     setSessionModalOpen(false);
-    setSessionForm({ notes: '' });
+    setSessionForm({ date: format(new Date(), 'yyyy-MM-dd'), notes: '' });
     toast.success('تم إضافة الجلسة');
   };
 
@@ -376,38 +390,57 @@ export default function PatientProfile() {
 
           {/* Treatment List */}
           <div className="bg-card rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm text-right">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="text-start p-3 font-medium">العلاج</th>
-                  <th className="text-start p-3 font-medium">السن/الفك</th>
-                  <th className="text-start p-3 font-medium">الطبيب</th>
-                  <th className="text-start p-3 font-medium">الحالة</th>
-                  <th className="text-start p-3 font-medium">إجراء</th>
+                  <th className="text-right p-3 ps-0 font-medium">العلاج</th>
+                  <th className="text-right p-3 font-medium">السن/الفك</th>
+                  <th className="text-right p-3 font-medium">الطبيب</th>
+                  <th className="text-right p-3 font-medium">الحالة</th>
+                  {chartTab === 'completed' && (
+                    <th className="text-right p-3 ps-3 font-medium">ملاحظات إنهاء العلاج</th>
+                  )}
+                  {chartTab !== 'completed' && (
+                    <th className="text-right p-3 pe-0 font-medium">إجراء</th>
+                  )}
                 </tr>
               </thead>
               <tbody ref={treatmentListRef}>
                 {treatments.filter(t => t.status === chartTab).map(t => (
                   <tr key={t.id} className="border-b border-border" data-tooth={t.toothNumber ?? undefined}>
-                    <td className="p-3 font-medium">{t.treatmentName}</td>
+                    <td className="p-3 ps-0 font-medium">{t.treatmentName}</td>
                     <td className="p-3">{t.toothNumber || (t.jaw === 'upper' ? 'علوي' : t.jaw === 'lower' ? 'سفلي' : t.jaw === 'both' ? 'فكين' : '-')}</td>
                     <td className="p-3">{getDoctorName(t.doctorId)}</td>
                     <td className="p-3"><Badge variant="outline">{chartTab === 'planned' ? 'مخطط' : chartTab === 'in_progress' ? 'جاري' : 'مكتمل'}</Badge></td>
-                    <td className="p-3 flex gap-1">
+                    {chartTab === 'completed' && (
+                      <td className="p-3 ps-3 max-w-[200px]" title={t.completedNotes || undefined}>
+                        <span className="line-clamp-2 text-muted-foreground">{t.completedNotes || '—'}</span>
+                      </td>
+                    )}
+                    {chartTab !== 'completed' && (
+                    <td className="p-3 pe-0 flex gap-1 justify-end">
                       {t.status === 'planned' && !t.isOldTreatment && (
                         <Button size="sm" variant="outline" onClick={() => startTreatment(t.id)}><Play className="w-3 h-3 ml-1" /> بدء</Button>
                       )}
                       {t.status === 'in_progress' && (
-                        <>
-                          <Button size="sm" variant="outline" onClick={() => { setActiveTreatmentId(t.id); setSessionModalOpen(true); }}>جلسة</Button>
-                          <Button size="sm" variant="outline" onClick={() => completeTreatment(t.id)}><CheckCircle className="w-3 h-3 ml-1" /> إنهاء</Button>
-                        </>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => { setActiveTreatmentId(t.id); setSessionForm(prev => ({ ...prev, date: format(new Date(), 'yyyy-MM-dd') })); setSessionModalOpen(true); }}>
+                            إضافة جلسة
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { setActiveTreatmentId(t.id); setCompleteTreatmentNotes(''); setCompleteTreatmentModalOpen(true); }}>
+                            إنهاء العلاج
+                          </Button>
+                          <Button size="sm" variant="outline" asChild>
+                            <Link to={`/patients/${id}/treatments/${t.id}/sessions`}>عرض الجلسات</Link>
+                          </Button>
+                        </div>
                       )}
                     </td>
+                    )}
                   </tr>
                 ))}
                 {treatments.filter(t => t.status === chartTab).length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">لا توجد علاجات</td></tr>
+                  <tr><td colSpan={chartTab === 'completed' ? 5 : 5} className="p-8 text-center text-muted-foreground">لا توجد علاجات</td></tr>
                 )}
               </tbody>
             </table>
@@ -567,14 +600,15 @@ export default function PatientProfile() {
         {/* Tab 8: Logs */}
         <TabsContent value="logs">
           <div className="bg-card rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm text-right">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="text-start p-3 font-medium">السن/الفك</th>
-                  <th className="text-start p-3 font-medium">العلاج</th>
-                  <th className="text-start p-3 font-medium">الحالة</th>
-                  <th className="text-start p-3 font-medium">المستخدم</th>
-                  <th className="text-start p-3 font-medium">التاريخ</th>
+                  <th className="text-right p-3 font-medium">السن/الفك</th>
+                  <th className="text-right p-3 font-medium">العلاج</th>
+                  <th className="text-right p-3 font-medium">الحالة</th>
+                  <th className="text-right p-3 font-medium">المستخدم</th>
+                  <th className="text-right p-3 font-medium">التاريخ</th>
+                  <th className="text-right p-3 font-medium">ملاحظات إنهاء العلاج</th>
                 </tr>
               </thead>
               <tbody>
@@ -585,9 +619,12 @@ export default function PatientProfile() {
                     <td className="p-3">{t.status === 'planned' ? 'مخطط' : t.status === 'in_progress' ? 'جاري' : 'مكتمل'}</td>
                     <td className="p-3">{getDoctorName(t.doctorId)}</td>
                     <td className="p-3 text-muted-foreground">{t.createdAt.split('T')[0]}</td>
+                    <td className="p-3 max-w-[200px]" title={t.completedNotes || undefined}>
+                      <span className="line-clamp-2 text-muted-foreground">{t.completedNotes || '—'}</span>
+                    </td>
                   </tr>
                 ))}
-                {treatments.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">لا توجد سجلات</td></tr>}
+                {treatments.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">لا توجد سجلات</td></tr>}
               </tbody>
             </table>
           </div>
@@ -736,6 +773,16 @@ export default function PatientProfile() {
                 </Select>
               </div>
             </div>
+            <div>
+              <Label>ملاحظات اول جلسة</Label>
+              <Textarea
+                value={invoiceForm.firstSessionNotes}
+                onChange={e => setInvoiceForm({ ...invoiceForm, firstSessionNotes: e.target.value })}
+                placeholder="اختياري: ملاحظات الجلسة الأولى"
+                rows={3}
+                className="resize-none"
+              />
+            </div>
             <div className="bg-muted/50 rounded-lg p-3 text-lg font-bold">
               الصافي: {(() => {
                 let t = invoiceForm.basePrice + invoiceForm.diagnosticFee;
@@ -806,8 +853,53 @@ export default function PatientProfile() {
         <DialogContent>
           <DialogHeader><DialogTitle>إضافة ملاحظات جلسة</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div><Label>ملاحظات</Label><Textarea value={sessionForm.notes} onChange={e => setSessionForm({ notes: e.target.value })} /></div>
+            <div>
+              <Label>التاريخ</Label>
+              <Input
+                type="date"
+                value={sessionForm.date}
+                onChange={e => setSessionForm(prev => ({ ...prev, date: e.target.value }))}
+              />
+            </div>
+            <div><Label>ملاحظات</Label><Textarea value={sessionForm.notes} onChange={e => setSessionForm(prev => ({ ...prev, notes: e.target.value }))} /></div>
             <Button onClick={addSession} className="w-full">إضافة</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Treatment Modal */}
+      <Dialog open={completeTreatmentModalOpen} onOpenChange={setCompleteTreatmentModalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>إنهاء العلاج</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            {activeTreatmentId && (() => {
+              const inv = invoices.find(i => i.treatmentId === activeTreatmentId);
+              const finalPrice = inv ? inv.total : 0;
+              return (
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <Label className="text-muted-foreground">السعر النهائي (بعد الخصم)</Label>
+                  <p className="text-2xl font-bold mt-1">{finalPrice.toLocaleString()} ل.س</p>
+                </div>
+              );
+            })()}
+            <div>
+              <Label>ملاحظات نهائية للطبيب</Label>
+              <Textarea
+                value={completeTreatmentNotes}
+                onChange={e => setCompleteTreatmentNotes(e.target.value)}
+                placeholder="ملاحظات للذكرى المستقبلية لهذا العلاج..."
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setCompleteTreatmentModalOpen(false)}>
+                إلغاء
+              </Button>
+              <Button className="flex-1" onClick={confirmCompleteTreatment}>
+                تأكيد وإنهاء العلاج
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

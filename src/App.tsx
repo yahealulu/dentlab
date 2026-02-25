@@ -14,6 +14,7 @@ import DoctorsManagement from "@/pages/DoctorsManagement";
 import TreatmentsSetup from "@/pages/TreatmentsSetup";
 import PatientsList from "@/pages/PatientsList";
 import PatientProfile from "@/pages/PatientProfile";
+import TreatmentSessionsPage from "@/pages/TreatmentSessionsPage";
 import Appointments from "@/pages/Appointments";
 import StaffManagement from "@/pages/StaffManagement";
 import InvoicesPage from "@/pages/Invoices";
@@ -47,6 +48,7 @@ const App = () => {
                 <Route path="/" element={<Dashboard />} />
               <Route path="/patients" element={<PatientsList />} />
               <Route path="/patients/:id" element={<PatientProfile />} />
+                <Route path="/patients/:id/treatments/:treatmentId/sessions" element={<TreatmentSessionsPage />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route path="/settings/clinic" element={<ClinicSettings />} />
               <Route path="/settings/treatments" element={<TreatmentsSetup />} />

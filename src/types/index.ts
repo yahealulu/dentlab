@@ -83,6 +83,8 @@ export interface PatientTreatment {
   sessions: TreatmentSession[];
   isOldTreatment: boolean;
   createdAt: string;
+  /** Notes added by the doctor when completing the treatment (for future reference). */
+  completedNotes?: string;
 }
 
 export interface TreatmentSession {
