@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { getStore, setStore, STORAGE_KEYS } from '@/lib/storage';
-import type { ClinicSettings } from '@/types';
+import { getStore, setStore, generateId, STORAGE_KEYS } from '@/lib/storage';
+import type { ClinicSettings, WorkShift } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,8 +16,9 @@ export default function ClinicSettingsPage() {
     const stored = getStore<ClinicSettings>(STORAGE_KEYS.clinicSettings, {
       workDays: [0, 1, 2, 3, 4], startTime: '09:00', endTime: '17:00', shifts: [], holidays: [], logo: null, tags: [], slotDuration: 30,
     });
-    // Normalize to single shift for spec: one From/To for entire clinic
-    const shifts = stored.shifts?.length ? [stored.shifts[0]] : [{ id: 'default', startTime: stored.startTime, endTime: stored.endTime }];
+    const shifts: WorkShift[] = stored.shifts?.length
+      ? stored.shifts
+      : [{ id: 'default', startTime: stored.startTime, endTime: stored.endTime }];
     return { ...stored, shifts, startTime: shifts[0].startTime, endTime: shifts[0].endTime };
   });
   const [newHoliday, setNewHoliday] = useState('');
@@ -56,9 +57,31 @@ export default function ClinicSettingsPage() {
     setNewTag('');
   };
 
-  const updateWorkingHours = (field: 'startTime' | 'endTime', value: string) => {
-    const shift = { id: 'default', startTime: field === 'startTime' ? value : settings.startTime, endTime: field === 'endTime' ? value : settings.endTime };
-    save({ ...settings, startTime: shift.startTime, endTime: shift.endTime, shifts: [shift] });
+  const updateShift = (index: number, field: 'startTime' | 'endTime', value: string) => {
+    const shifts = settings.shifts.map((s, i) =>
+      i === index ? { ...s, [field]: value } : s
+    );
+    save({ ...settings, shifts, startTime: shifts[0].startTime, endTime: shifts[0].endTime });
+  };
+
+  const addShift = () => {
+    const newShift: WorkShift = {
+      id: generateId(),
+      startTime: '18:00',
+      endTime: '21:00',
+    };
+    const shifts = [...settings.shifts, newShift];
+    save({ ...settings, shifts });
+    toast.success('تمت إضافة فترة');
+  };
+
+  const removeShift = (index: number) => {
+    if (settings.shifts.length <= 1) {
+      toast.error('يجب أن تبقى فترة واحدة على الأقل');
+      return;
+    }
+    const shifts = settings.shifts.filter((_, i) => i !== index);
+    save({ ...settings, shifts, startTime: shifts[0].startTime, endTime: shifts[0].endTime });
   };
 
   return (
@@ -89,22 +112,50 @@ export default function ClinicSettingsPage() {
         </div>
       </div>
 
-      {/* Working Hours - single From/To for entire clinic */}
+      {/* Working Hours - multiple shifts */}
       <div className="bg-card rounded-xl border border-border p-6 space-y-4 hover-lift">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary" />
           ساعات العمل
         </h2>
-        <p className="text-sm text-muted-foreground">تطبق على العيادة بأكملها</p>
-        <div className="flex gap-4 items-center flex-wrap">
-          <div>
-            <Label className="text-xs text-muted-foreground">من</Label>
-            <Input type="time" value={settings.startTime} onChange={e => updateWorkingHours('startTime', e.target.value)} className="w-36" />
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">إلى</Label>
-            <Input type="time" value={settings.endTime} onChange={e => updateWorkingHours('endTime', e.target.value)} className="w-36" />
-          </div>
+        <p className="text-sm text-muted-foreground">يمكنك إضافة أكثر من فترة (مثلاً: 9–5 و 6–9)</p>
+        <div className="space-y-3">
+          {settings.shifts.map((shift, index) => (
+            <div key={shift.id} className="flex gap-3 items-end flex-wrap rounded-lg border border-border p-3 bg-muted/30">
+              <div>
+                <Label className="text-xs text-muted-foreground">من</Label>
+                <Input
+                  type="time"
+                  value={shift.startTime}
+                  onChange={e => updateShift(index, 'startTime', e.target.value)}
+                  className="w-36"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">إلى</Label>
+                <Input
+                  type="time"
+                  value={shift.endTime}
+                  onChange={e => updateShift(index, 'endTime', e.target.value)}
+                  className="w-36"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:bg-destructive/10"
+                onClick={() => removeShift(index)}
+                disabled={settings.shifts.length <= 1}
+                title="حذف الفترة"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          <Button type="button" variant="outline" size="sm" onClick={addShift}>
+            <Plus className="w-4 h-4 ml-1" /> إضافة فترة
+          </Button>
         </div>
       </div>
 
