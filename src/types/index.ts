@@ -20,6 +20,10 @@ export interface Doctor {
   name: string;
   specialty: string;
   phone: string;
+  /** Clinic owner; always shown first and cannot be deactivated */
+  isOwner?: boolean;
+  /** When false, doctor does not appear in dropdowns when adding treatments/appointments; name still shown on linked records */
+  isActive?: boolean;
 }
 
 export interface TreatmentGroup {

@@ -27,6 +27,7 @@ export default function PatientProfile() {
   const patients = getStore<Patient[]>(STORAGE_KEYS.patients, []);
   const patient = patients.find(p => p.id === id);
   const doctors = getStore<Doctor[]>(STORAGE_KEYS.doctors, []);
+  const activeDoctors = useMemo(() => doctors.filter(d => d.isActive !== false), [doctors]);
   const groups = getStore<TreatmentGroup[]>(STORAGE_KEYS.treatmentGroups, []);
 
   const [treatments, setTreatments] = useState<PatientTreatment[]>(() =>
@@ -745,7 +746,7 @@ export default function PatientProfile() {
               <Label>الطبيب</Label>
               <Select value={treatmentForm.doctorId} onValueChange={v => setTreatmentForm({ ...treatmentForm, doctorId: v })}>
                 <SelectTrigger><SelectValue placeholder="اختر الطبيب" /></SelectTrigger>
-                <SelectContent>{doctors.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{activeDoctors.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <Button onClick={handleAddTreatment} className="w-full">إضافة</Button>

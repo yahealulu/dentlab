@@ -1,4 +1,4 @@
-import type { ClinicSettings, TreatmentGroup, WorkShift } from '@/types';
+import type { ClinicSettings, TreatmentGroup, WorkShift, Doctor } from '@/types';
 
 const KEYS = {
   clinicSettings: 'clinic_settings',
@@ -79,6 +79,10 @@ const DEFAULT_LAB_WORK_TYPES = [
 
 const DEFAULT_EXPENSE_TYPES = ['إيجار', 'كهرباء', 'ماء', 'مواد طبية', 'رواتب', 'صيانة', 'مصاريف أخرى'];
 
+const DEFAULT_DOCTORS: Doctor[] = [
+  { id: 'owner', name: 'مالك العيادة', specialty: '', phone: '', isOwner: true, isActive: true },
+];
+
 export function initializeStorage(): void {
   if (!localStorage.getItem(KEYS.clinicSettings)) {
     setStore(KEYS.clinicSettings, DEFAULT_SETTINGS);
@@ -92,8 +96,11 @@ export function initializeStorage(): void {
   if (!localStorage.getItem(KEYS.expenseTypes)) {
     setStore(KEYS.expenseTypes, DEFAULT_EXPENSE_TYPES);
   }
-  // Initialize empty arrays
-  const emptyArrayKeys = [KEYS.doctors, KEYS.patients, KEYS.appointments, KEYS.invoices, KEYS.payments, KEYS.expenses, KEYS.staff, KEYS.prescriptions, KEYS.patientFiles, KEYS.patientTreatments, KEYS.labs, KEYS.labOrders, KEYS.labPayments, KEYS.doctorPayments];
+  if (!localStorage.getItem(KEYS.doctors)) {
+    setStore(KEYS.doctors, DEFAULT_DOCTORS);
+  }
+  // Initialize empty arrays for the rest
+  const emptyArrayKeys = [KEYS.patients, KEYS.appointments, KEYS.invoices, KEYS.payments, KEYS.expenses, KEYS.staff, KEYS.prescriptions, KEYS.patientFiles, KEYS.patientTreatments, KEYS.labs, KEYS.labOrders, KEYS.labPayments, KEYS.doctorPayments];
   emptyArrayKeys.forEach(key => {
     if (!localStorage.getItem(key)) setStore(key, []);
   });

@@ -95,6 +95,7 @@ export default function AppointmentsPage() {
   }, []);
 
   const doctors = getStore<Doctor[]>(STORAGE_KEYS.doctors, []);
+  const activeDoctors = useMemo(() => doctors.filter(d => d.isActive !== false), [doctors]);
   const patients = getStore<Patient[]>(STORAGE_KEYS.patients, []);
   const groups = getStore<TreatmentGroup[]>(STORAGE_KEYS.treatmentGroups, []);
 
@@ -343,18 +344,18 @@ export default function AppointmentsPage() {
             <thead className="bg-muted/50">
               <tr>
                 <th className="p-3 text-start font-medium w-20">الوقت</th>
-                {doctors.length > 0 ? doctors.map(d => (
+                {activeDoctors.length > 0 ? activeDoctors.map(d => (
                   <th key={d.id} className="p-3 text-start font-medium">{d.name}</th>
                 )) : <th className="p-3 text-start font-medium">المواعيد</th>}
               </tr>
             </thead>
             <tbody>
               {!isWorkDay(currentDate) || isHoliday(currentDate) ? (
-                <tr><td colSpan={doctors.length + 1} className="p-8 text-center text-muted-foreground">يوم عطلة</td></tr>
+                <tr><td colSpan={activeDoctors.length + 1} className="p-8 text-center text-muted-foreground">يوم عطلة</td></tr>
               ) : timeSlots.map(time => (
                 <tr key={time} className="border-b border-border/50 hover:bg-muted/20">
                   <td className="p-2 text-muted-foreground font-mono text-xs">{formatTime12(time)}</td>
-                  {(doctors.length > 0 ? doctors : [{ id: '' }]).map((d, di) => {
+                  {(activeDoctors.length > 0 ? activeDoctors : [{ id: '' }]).map((d, di) => {
                     const apts = getAppointmentsAt(currentDate, time, d.id || undefined);
                     return (
                       <td key={di} className="p-1 min-w-[150px]" onClick={() => apts.length === 0 && openBookingAt(currentDate, time)}>
@@ -531,7 +532,7 @@ export default function AppointmentsPage() {
               <Label>الطبيب</Label>
               <Select value={form.doctorId} onValueChange={v => setForm({ ...form, doctorId: v })}>
                 <SelectTrigger><SelectValue placeholder="اختر الطبيب" /></SelectTrigger>
-                <SelectContent>{doctors.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{activeDoctors.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="flex gap-3">
