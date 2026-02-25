@@ -1,14 +1,12 @@
 import { useState, useMemo } from 'react';
-import { getStore, setStore, STORAGE_KEYS, generateId } from '@/lib/storage';
+import { getStore, setStore, STORAGE_KEYS } from '@/lib/storage';
 import type { Staff, Doctor } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Shield, UserCog, UserPlus } from 'lucide-react';
+import { Shield, UserCog } from 'lucide-react';
 
 const ALL_PERMISSIONS = [
   { key: 'patients', label: 'المرضى' },
@@ -20,21 +18,12 @@ const ALL_PERMISSIONS = [
   { key: 'settings', label: 'الإعدادات' },
 ];
 
-const defaultAddNurse = {
-  name: '',
-  phone: '',
-  hasLogin: true,
-  permissions: [] as string[],
-};
-
 export default function StaffManagement() {
   const [staff, setStaff] = useState<Staff[]>(() => getStore(STORAGE_KEYS.staff, []));
   const doctors = getStore<Doctor[]>(STORAGE_KEYS.doctors, []);
   const [permOpen, setPermOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [editPermissions, setEditPermissions] = useState<string[]>([]);
-  const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState(defaultAddNurse);
 
   const save = (s: Staff[]) => { setStaff(s); setStore(STORAGE_KEYS.staff, s); };
 
@@ -82,41 +71,6 @@ export default function StaffManagement() {
     toast.success('تم حفظ الصلاحيات');
   };
 
-  const openAddNurse = () => {
-    setAddForm(defaultAddNurse);
-    setAddOpen(true);
-  };
-
-  const toggleAddPermission = (key: string) => {
-    setAddForm(prev => ({
-      ...prev,
-      permissions: prev.permissions.includes(key)
-        ? prev.permissions.filter(p => p !== key)
-        : [...prev.permissions, key],
-    }));
-  };
-
-  const addNurse = () => {
-    const name = addForm.name.trim();
-    if (!name) {
-      toast.error('الاسم مطلوب');
-      return;
-    }
-    const newStaff: Staff = {
-      id: generateId(),
-      name,
-      role: 'nurse',
-      phone: addForm.phone.trim() || '',
-      isActive: true,
-      hasLogin: addForm.hasLogin,
-      permissions: addForm.permissions,
-      doctorId: null,
-    };
-    save([...staff, newStaff]);
-    setAddOpen(false);
-    toast.success('تم إضافة الممرض بنجاح');
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -126,13 +80,9 @@ export default function StaffManagement() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">العاملون والصلاحيات</h1>
-            <p className="text-sm text-muted-foreground">الحسابات تظهر تلقائياً - يمكنك إضافة ممرضين وتحديد صلاحياتهم</p>
+            <p className="text-sm text-muted-foreground">الحسابات تظهر تلقائياً - يمكنك تحديد صلاحيات الممرضين</p>
           </div>
         </div>
-        <Button onClick={openAddNurse} className="gap-2">
-          <UserPlus className="w-4 h-4" />
-          إضافة ممرض
-        </Button>
       </div>
 
       <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -206,64 +156,6 @@ export default function StaffManagement() {
         <p>💡 <strong>ملاحظة:</strong> حسابات الأطباء والممرضين يتم إنشاؤها يدوياً من قبل صاحب المشروع. الأطباء لا يملكون صلاحية دخول للنظام.</p>
         <p className="mt-1">تغيير كلمة المرور سيكون متاحاً في تحديث قادم.</p>
       </div>
-
-      {/* Add Nurse Modal */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>إضافة ممرض / مساعد</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="add-name">الاسم</Label>
-              <Input
-                id="add-name"
-                value={addForm.name}
-                onChange={e => setAddForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="اسم الممرض أو المساعد"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-phone">الهاتف</Label>
-              <Input
-                id="add-phone"
-                value={addForm.phone}
-                onChange={e => setAddForm(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="رقم الهاتف"
-                dir="ltr"
-              />
-            </div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <Checkbox
-                checked={addForm.hasLogin}
-                onCheckedChange={checked => setAddForm(prev => ({ ...prev, hasLogin: !!checked }))}
-              />
-              <span className="text-sm font-medium">صلاحية الدخول للنظام</span>
-            </label>
-            <div className="space-y-2">
-              <Label>الصلاحيات</Label>
-              <p className="text-xs text-muted-foreground">حدد الأقسام التي يمكن للممرض الوصول إليها</p>
-              <div className="space-y-2 mt-2">
-                {ALL_PERMISSIONS.map(p => (
-                  <label
-                    key={p.key}
-                    className={`flex items-center gap-3 cursor-pointer p-2.5 rounded-lg border transition-all ${addForm.permissions.includes(p.key) ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'}`}
-                  >
-                    <Checkbox
-                      checked={addForm.permissions.includes(p.key)}
-                      onCheckedChange={() => toggleAddPermission(p.key)}
-                    />
-                    <span className="text-sm">{p.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <Button onClick={addNurse} className="w-full">
-              إضافة الممرض
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Permissions Modal */}
       <Dialog open={permOpen} onOpenChange={setPermOpen}>
