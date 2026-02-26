@@ -15,6 +15,7 @@ import { Plus, Play, CheckCircle, FileText, Upload, Printer, ArrowRight, Share2 
 import DentalChartCircular from '@/components/DentalChart/DentalChartCircular';
 import { ALL_TEETH } from '@/components/DentalChart/constants';
 import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 const VALID_TOOTH_SET = new Set(ALL_TEETH);
 const isValidToothNumber = (value: string): boolean => {
@@ -54,6 +55,8 @@ export default function PatientProfile() {
   const [prescriptionOpen, setPrescriptionOpen] = useState(false);
   const [fileUploadOpen, setFileUploadOpen] = useState(false);
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [sessionsViewOpen, setSessionsViewOpen] = useState(false);
+  const [sessionsViewTreatment, setSessionsViewTreatment] = useState<PatientTreatment | null>(null);
   const [completeTreatmentModalOpen, setCompleteTreatmentModalOpen] = useState(false);
   const [completeTreatmentNotes, setCompleteTreatmentNotes] = useState('');
 
@@ -431,8 +434,8 @@ export default function PatientProfile() {
                           <Button size="sm" variant="outline" onClick={() => { setActiveTreatmentId(t.id); setCompleteTreatmentNotes(''); setCompleteTreatmentModalOpen(true); }}>
                             إنهاء العلاج
                           </Button>
-                          <Button size="sm" variant="outline" asChild>
-                            <Link to={`/patients/${id}/treatments/${t.id}/sessions`}>عرض الجلسات</Link>
+                          <Button size="sm" variant="outline" onClick={() => { setSessionsViewTreatment(t); setSessionsViewOpen(true); }}>
+                            عرض الجلسات
                           </Button>
                         </div>
                       )}
@@ -864,6 +867,53 @@ export default function PatientProfile() {
             </div>
             <div><Label>ملاحظات</Label><Textarea value={sessionForm.notes} onChange={e => setSessionForm(prev => ({ ...prev, notes: e.target.value }))} /></div>
             <Button onClick={addSession} className="w-full">إضافة</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sessions View Modal */}
+      <Dialog open={sessionsViewOpen} onOpenChange={(open) => { setSessionsViewOpen(open); if (!open) setSessionsViewTreatment(null); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {sessionsViewTreatment ? `جلسات العلاج: ${sessionsViewTreatment.treatmentName}` : 'جلسات العلاج'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 min-h-0">
+            {sessionsViewTreatment && (() => {
+              const sessions = sessionsViewTreatment.sessions ?? [];
+              return (
+                <div className="space-y-4">
+                  {sessions.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">لا توجد جلسات مسجلة لهذا العلاج بعد.</p>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {sessions.map((session, index) => (
+                        <div key={session.id} className="p-4">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-sm font-semibold text-muted-foreground">جلسة {index + 1}</span>
+                            <span className="text-sm font-medium">
+                              {format(new Date(session.date), 'EEEE، d MMMM yyyy', { locale: ar })}
+                            </span>
+                          </div>
+                          {session.notes ? (
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{session.notes}</p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">لا توجد ملاحظات</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {sessionsViewTreatment.status === 'completed' && (sessionsViewTreatment.completedNotes ?? '').trim() && (
+                    <div className="rounded-lg border border-border p-4 mt-4 bg-muted/30">
+                      <h3 className="font-semibold text-sm text-foreground mb-1">ملاحظات إنهاء العلاج</h3>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{sessionsViewTreatment.completedNotes}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>
