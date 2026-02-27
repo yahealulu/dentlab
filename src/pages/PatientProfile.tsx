@@ -59,6 +59,7 @@ export default function PatientProfile() {
   const [sessionsViewTreatment, setSessionsViewTreatment] = useState<PatientTreatment | null>(null);
   const [completeTreatmentModalOpen, setCompleteTreatmentModalOpen] = useState(false);
   const [completeTreatmentNotes, setCompleteTreatmentNotes] = useState('');
+  const [completeTreatmentFinalPrice, setCompleteTreatmentFinalPrice] = useState(0);
 
   // Forms
   const [treatmentForm, setTreatmentForm] = useState({ groupId: '', treatmentId: '', toothNumber: '', jaw: '', effectType: '' as '' | 'tooth' | 'jaw', doctorId: '', isOld: false });
@@ -183,7 +184,15 @@ export default function PatientProfile() {
 
   const confirmCompleteTreatment = () => {
     if (!activeTreatmentId) return;
+    const inv = invoices.find(i => i.treatmentId === activeTreatmentId);
+    if (inv) {
+      const newTotal = Math.max(0, completeTreatmentFinalPrice);
+      const newStatus = inv.paid >= newTotal ? (inv.paid > newTotal ? 'paid' : 'paid') : (inv.paid > 0 ? 'partial' : 'unpaid');
+      saveInvoices(invoices.map(i => i.id === inv.id ? { ...i, total: newTotal, status: newStatus } : i));
+    }
     completeTreatment(activeTreatmentId, completeTreatmentNotes);
+    setCompleteTreatmentModalOpen(false);
+    setCompleteTreatmentNotes('');
   };
 
   // Add Session
@@ -431,7 +440,13 @@ export default function PatientProfile() {
                           <Button size="sm" variant="outline" onClick={() => { setActiveTreatmentId(t.id); setSessionForm(prev => ({ ...prev, date: format(new Date(), 'yyyy-MM-dd') })); setSessionModalOpen(true); }}>
                             إضافة جلسة
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => { setActiveTreatmentId(t.id); setCompleteTreatmentNotes(''); setCompleteTreatmentModalOpen(true); }}>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            setActiveTreatmentId(t.id);
+                            setCompleteTreatmentNotes('');
+                            const inv = invoices.find(i => i.treatmentId === t.id);
+                            setCompleteTreatmentFinalPrice(inv ? inv.total : 0);
+                            setCompleteTreatmentModalOpen(true);
+                          }}>
                             إنهاء العلاج
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => { setSessionsViewTreatment(t); setSessionsViewOpen(true); }}>
@@ -923,16 +938,18 @@ export default function PatientProfile() {
         <DialogContent>
           <DialogHeader><DialogTitle>إنهاء العلاج</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            {activeTreatmentId && (() => {
-              const inv = invoices.find(i => i.treatmentId === activeTreatmentId);
-              const finalPrice = inv ? inv.total : 0;
-              return (
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <Label className="text-muted-foreground">السعر النهائي (بعد الخصم)</Label>
-                  <p className="text-2xl font-bold mt-1">{finalPrice.toLocaleString()} ل.س</p>
-                </div>
-              );
-            })()}
+            <div>
+              <Label className="text-muted-foreground">السعر النهائي (بعد الخصم)</Label>
+              <Input
+                type="number"
+                min={0}
+                step={100}
+                value={completeTreatmentFinalPrice}
+                onChange={e => setCompleteTreatmentFinalPrice(Number(e.target.value) || 0)}
+                className="mt-1 text-lg font-semibold"
+              />
+              <span className="text-sm text-muted-foreground ms-2">ل.س</span>
+            </div>
             <div>
               <Label>ملاحظات نهائية للطبيب</Label>
               <Textarea

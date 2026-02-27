@@ -58,7 +58,7 @@ function appointmentsOverlap(
   return start1 < end2 && end1 > start2;
 }
 
-/** Returns another appointment that overlaps the given slot for the same doctor, or null. */
+/** Returns another appointment that overlaps the given slot for the same doctor, or null. Cancelled appointments are ignored so the slot can be rebooked. */
 function getConflictingAppointment(
   appointments: Appointment[],
   date: string,
@@ -69,6 +69,7 @@ function getConflictingAppointment(
 ): Appointment | null {
   return appointments.find(
     (a) =>
+      a.status !== 'cancelled' &&
       a.doctorId === doctorId &&
       a.date === date &&
       a.id !== excludeId &&
@@ -139,11 +140,12 @@ export default function AppointmentsPage() {
     return slots;
   }, [settings]);
 
-  /** Appointments that start in this row's 15-min window (same date, optional same doctor). */
+  /** Appointments that start in this row's 15-min window (same date, optional same doctor). Cancelled are excluded so the slot appears free for rebooking. */
   const getAppointmentsAt = useCallback((date: string, time: string, doctorId?: string) => {
     const rowStart = timeToMinutes(time);
     const rowEnd = rowStart + GRID_SLOT_MINUTES;
     return appointments.filter((a) => {
+      if (a.status === 'cancelled') return false;
       if (a.date !== date || (doctorId && a.doctorId !== doctorId)) return false;
       const start = timeToMinutes(a.time);
       return start >= rowStart && start < rowEnd;
