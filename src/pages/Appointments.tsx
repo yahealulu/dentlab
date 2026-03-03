@@ -27,6 +27,19 @@ import { formatTime12, formatTimeRange12 } from '@/utils/formatTime';
 
 const GRID_SLOT_MINUTES = 15; // grid rows every 15 min so any chosen time has a row
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
+/** Allowed minute values for appointment time picker (quarter-hour only). */
+const TIME_MINUTE_OPTIONS = ['00', '15', '30', '45'] as const;
+
+/** Snaps a time string to the nearest quarter-hour (00, 15, 30, 45). */
+function snapTimeToQuarter(time: string): string {
+  if (!time?.trim()) return time;
+  const [h, m] = time.split(':').map(Number);
+  const hour = Math.min(23, Math.max(0, h ?? 0));
+  const minute = m ?? 0;
+  const snapped = Math.round(minute / 15) * 15;
+  const finalM = snapped >= 60 ? 45 : snapped < 0 ? 0 : snapped;
+  return `${String(hour).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`;
+}
 
 const statusColors: Record<string, string> = {
   scheduled: 'bg-info/80', waiting: 'bg-warning/80', in_progress: 'bg-primary/80', completed: 'bg-success/80', cancelled: 'bg-destructive/30',
@@ -119,7 +132,7 @@ export default function AppointmentsPage() {
 
   const [form, setForm] = useState({
     treatmentType: 'فحص', doctorId: '', date: format(new Date(), 'yyyy-MM-dd'),
-    time: settings.startTime ?? '09:00', duration: 30, patientId: '', tempPatientName: '', notes: '',
+    time: snapTimeToQuarter(settings.startTime ?? '09:00'), duration: 30, patientId: '', tempPatientName: '', notes: '',
   });
 
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -151,6 +164,16 @@ export default function AppointmentsPage() {
     return slots;
   }, [settings]);
 
+  /** Unique hours from timeSlots for the time picker (quarter-hour minutes 00,15,30,45). */
+  const timePickerHours = useMemo(() => {
+    const hours = new Set<number>();
+    timeSlots.forEach((slot) => {
+      const h = parseInt(slot.slice(0, 2), 10);
+      if (!Number.isNaN(h)) hours.add(h);
+    });
+    return Array.from(hours).sort((a, b) => a - b);
+  }, [timeSlots]);
+
   /** Appointments that start in this row's 15-min window (same date, optional same doctor). Cancelled are excluded so the slot appears free for rebooking. */
   const getAppointmentsAt = useCallback((date: string, time: string, doctorId?: string) => {
     const rowStart = timeToMinutes(time);
@@ -168,7 +191,8 @@ export default function AppointmentsPage() {
     if (!form.doctorId) { toast.error('اختر الطبيب'); return; }
     if (patientMode === 'existing' && !form.patientId) { toast.error('اختر المريض'); return; }
     if (patientMode === 'new' && !form.tempPatientName) { toast.error('أدخل اسم المريض'); return; }
-    if (!form.time?.trim()) { toast.error('أدخل وقت الموعد'); return; }
+    const time = snapTimeToQuarter(form.time ?? '');
+    if (!time?.trim()) { toast.error('أدخل وقت الموعد'); return; }
     if (form.duration < 15 || form.duration > 240) {
       toast.error('المدة بين ١٥ و ٢٤٠ دقيقة');
       return;
@@ -177,7 +201,7 @@ export default function AppointmentsPage() {
     const conflict = getConflictingAppointment(
       appointments,
       form.date,
-      form.time,
+      time,
       form.duration,
       form.doctorId
     );
@@ -190,7 +214,7 @@ export default function AppointmentsPage() {
     const newApt: Appointment = {
       id: generateId(),
       date: form.date,
-      time: form.time,
+      time,
       duration: form.duration,
       doctorId: form.doctorId,
       patientId: patientMode === 'existing' ? form.patientId : null,
@@ -206,14 +230,15 @@ export default function AppointmentsPage() {
 
   const openDetailModal = (apt: Appointment) => {
     setSelectedAppointment(apt);
-    setEditForm({ date: apt.date, time: apt.time, duration: apt.duration });
+    setEditForm({ date: apt.date, time: snapTimeToQuarter(apt.time), duration: apt.duration });
     setConflictError(null);
   };
 
   const handleUpdateAppointment = () => {
     if (!selectedAppointment) return;
     setConflictError(null);
-    if (!editForm.time?.trim()) { toast.error('أدخل وقت الموعد'); return; }
+    const time = snapTimeToQuarter(editForm.time ?? '');
+    if (!time?.trim()) { toast.error('أدخل وقت الموعد'); return; }
     if (editForm.duration < 15 || editForm.duration > 240) {
       toast.error('المدة بين ١٥ و ٢٤٠ دقيقة');
       return;
@@ -221,7 +246,7 @@ export default function AppointmentsPage() {
     const conflict = getConflictingAppointment(
       appointments,
       editForm.date,
-      editForm.time,
+      time,
       editForm.duration,
       selectedAppointment.doctorId,
       selectedAppointment.id
@@ -233,7 +258,7 @@ export default function AppointmentsPage() {
     }
     const updated = appointments.map((a) =>
       a.id === selectedAppointment.id
-        ? { ...a, date: editForm.date, time: editForm.time, duration: editForm.duration }
+        ? { ...a, date: editForm.date, time, duration: editForm.duration }
         : a
     );
     save(updated);
@@ -605,11 +630,48 @@ export default function AppointmentsPage() {
               <div className="flex-1"><Label>التاريخ</Label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
               <div className="flex-1">
                 <Label>الوقت</Label>
-                <Input
-                  type="time"
-                  value={form.time}
-                  onChange={e => { setForm({ ...form, time: e.target.value }); setConflictError(null); }}
-                />
+                <div className="flex gap-1">
+                  <Select
+                    value={(() => {
+                      const t = snapTimeToQuarter(form.time);
+                      const hour = t.slice(0, 2);
+                      return timePickerHours.includes(parseInt(hour, 10)) ? hour : String(timePickerHours[0] ?? 9).padStart(2, '0');
+                    })()}
+                    onValueChange={h => {
+                      const t = snapTimeToQuarter(form.time);
+                      const m = TIME_MINUTE_OPTIONS.includes((t.slice(3, 5) || '00') as typeof TIME_MINUTE_OPTIONS[number]) ? t.slice(3, 5) : '00';
+                      setForm({ ...form, time: `${h}:${m}` });
+                      setConflictError(null);
+                    }}
+                  >
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="ساعة" /></SelectTrigger>
+                    <SelectContent>
+                      {timePickerHours.map(h => (
+                        <SelectItem key={h} value={String(h).padStart(2, '0')}>{String(h).padStart(2, '0')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={(() => {
+                      const t = snapTimeToQuarter(form.time);
+                      const m = t.slice(3, 5) || '00';
+                      return TIME_MINUTE_OPTIONS.includes(m as typeof TIME_MINUTE_OPTIONS[number]) ? m : '00';
+                    })()}
+                    onValueChange={m => {
+                      const t = snapTimeToQuarter(form.time);
+                      const h = t.slice(0, 2) || '09';
+                      setForm({ ...form, time: `${h}:${m}` });
+                      setConflictError(null);
+                    }}
+                  >
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="دقيقة" /></SelectTrigger>
+                    <SelectContent>
+                      {TIME_MINUTE_OPTIONS.map(m => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="w-28">
                 <Label>المدة (دقيقة)</Label>
@@ -653,11 +715,47 @@ export default function AppointmentsPage() {
                 </div>
                 <div className="flex-1">
                   <Label>الوقت</Label>
-                  <Input
-                    type="time"
-                    value={editForm.time}
-                    onChange={e => { setEditForm(f => ({ ...f, time: e.target.value })); setConflictError(null); }}
-                  />
+                  <div className="flex gap-1">
+                    <Select
+                      value={(() => {
+                        const t = snapTimeToQuarter(editForm.time);
+                        return t.slice(0, 2) || '09';
+                      })()}
+                      onValueChange={h => {
+                        const t = snapTimeToQuarter(editForm.time);
+                        const m = TIME_MINUTE_OPTIONS.includes((t.slice(3, 5) || '00') as typeof TIME_MINUTE_OPTIONS[number]) ? t.slice(3, 5) : '00';
+                        setEditForm(f => ({ ...f, time: `${h}:${m}` }));
+                        setConflictError(null);
+                      }}
+                    >
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="ساعة" /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <SelectItem key={i} value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={(() => {
+                        const t = snapTimeToQuarter(editForm.time);
+                        const m = t.slice(3, 5) || '00';
+                        return TIME_MINUTE_OPTIONS.includes(m as typeof TIME_MINUTE_OPTIONS[number]) ? m : '00';
+                      })()}
+                      onValueChange={m => {
+                        const t = snapTimeToQuarter(editForm.time);
+                        const h = t.slice(0, 2) || '09';
+                        setEditForm(f => ({ ...f, time: `${h}:${m}` }));
+                        setConflictError(null);
+                      }}
+                    >
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="دقيقة" /></SelectTrigger>
+                      <SelectContent>
+                        {TIME_MINUTE_OPTIONS.map(m => (
+                          <SelectItem key={m} value={m}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="w-28">
                   <Label>المدة (دقيقة)</Label>
