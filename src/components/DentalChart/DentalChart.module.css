@@ -1,0 +1,132 @@
+/* DentalChart Container */
+.chartContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 400px;
+  padding: 1rem;
+}
+
+/* Main SVG Chart */
+.dentalChart {
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+  background-color: transparent;
+}
+
+/* Tooth Group - The clickable container for each tooth */
+.toothGroup {
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Tooth Path - The actual tooth shape */
+.toothPath {
+  transition: all 0.2s ease-in-out;
+  pointer-events: auto;
+}
+
+/* Tooth Text - The tooth number label */
+.toothText {
+  pointer-events: none;
+  transition: all 0.2s ease-in-out;
+  user-select: none;
+}
+
+/* ===== PERMANENT TEETH STYLING ===== */
+
+/* Default State - fill/stroke from getToothColor (Tailwind) */
+.toothGroup:not(.primaryTooth) .toothPath:first-child {
+  /* Overridden by className from getToothColor */
+}
+
+/* Hover State for Permanent Teeth - subtle highlight */
+.toothGroup:not(.primaryTooth):hover .toothPath:first-child {
+  opacity: 0.9;
+}
+
+/* Hover effect for detail lines - Permanent Teeth */
+.toothGroup:not(.primaryTooth):hover .toothPath[stroke="#666D80"] {
+  stroke: var(--primary, #0d9488);
+}
+
+/* Highlight (from highlightTooth) - Permanent Teeth */
+.toothGroup.highlighted:not(.primaryTooth) {
+  filter: url(#glow);
+}
+
+/* ===== PRIMARY (BABY) TEETH STYLING ===== */
+
+/* Default State for Primary Teeth */
+.primaryTooth .toothPath:first-child {
+  fill: white;
+  stroke: #9ca3af;
+}
+
+/* Hover State for Primary Teeth */
+.primaryTooth:hover .toothPath:first-child {
+  fill: #ede9fe;
+  stroke: #8b5cf6;
+}
+
+.primaryTooth:hover .toothText {
+  fill: #7c3aed;
+}
+
+/* ===== FOCUS STATES FOR ACCESSIBILITY ===== */
+.toothGroup:focus {
+  outline: 2px solid var(--primary, #0d9488);
+  outline-offset: 2px;
+}
+
+.toothGroup:focus-visible {
+  outline: 2px solid var(--primary, #0d9488);
+  outline-offset: 2px;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes selectPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.toothGroup.highlighted {
+  animation: selectPulse 0.3s ease-in-out;
+}
+
+/* Primary teeth appear animation */
+@keyframes fadeInPrimary {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.primaryTooth {
+  animation: fadeInPrimary 0.3s ease-out;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 480px) {
+  .chartContainer {
+    max-width: 100%;
+    padding: 0.5rem;
+  }
+
+  .dentalChart {
+    width: 100%;
+    height: auto;
+  }
+}

@@ -4,7 +4,9 @@ import type { Invoice, Patient, Doctor, Payment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Printer, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -16,12 +18,14 @@ export default function InvoicesPage() {
 
   const [dateFrom, setDateFrom] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [hidePaid, setHidePaid] = useState(false);
   const [detailsInvoice, setDetailsInvoice] = useState<Invoice | null>(null);
 
-  const filtered = useMemo(() =>
-    invoices.filter(i => i.date >= dateFrom && i.date <= dateTo).sort((a, b) => b.invoiceNo - a.invoiceNo),
-    [invoices, dateFrom, dateTo]
-  );
+  const filtered = useMemo(() => {
+    let list = invoices.filter(i => i.date >= dateFrom && i.date <= dateTo);
+    if (hidePaid) list = list.filter(i => i.status !== 'paid');
+    return list.sort((a, b) => b.invoiceNo - a.invoiceNo);
+  }, [invoices, dateFrom, dateTo, hidePaid]);
 
   const getPatientName = (id: string) => patients.find(p => p.id === id)?.fullName || '-';
   const getDoctorName = (id: string) => doctors.find(d => d.id === id)?.name || '-';
@@ -45,6 +49,10 @@ export default function InvoicesPage() {
           <span className="text-sm">إلى:</span>
           <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40" />
         </div>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <Checkbox checked={hidePaid} onCheckedChange={checked => setHidePaid(!!checked)} />
+          <Label className="text-sm font-normal cursor-pointer">إخفاء الفواتير المدفوعة</Label>
+        </label>
       </div>
 
       <div className="bg-card rounded-xl border border-border overflow-x-auto">

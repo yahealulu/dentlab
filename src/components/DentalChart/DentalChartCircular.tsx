@@ -1,20 +1,14 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import type { PatientTreatment } from '@/types';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import type { ChartStatusFilter } from './constants';
 import { getToothNameAr } from './toothNames';
-import {
-  PERMANENT_ORDER,
-  DECIDUOUS_ORDER,
-  getCircularToothPositions,
-} from './circularLayout';
+import { permanentTeethData, primaryTeethData } from './toothPathsData';
+import styles from './DentalChart.module.css';
 
-/** Oval chart: after 90° CCW rotation the oval is tall (head at top), so viewBox is taller than wide */
-const OVAL_VIEWBOX_WIDTH = 280;
-const OVAL_VIEWBOX_HEIGHT = 440;
-const OVAL_PADDING = 44;
-const TOOTH_RADIUS = 11;
+const CHART_VIEWBOX_WIDTH = 400;
+const CHART_VIEWBOX_HEIGHT = 600;
 
 export interface DentalChartCircularProps {
   treatments: PatientTreatment[];
@@ -26,8 +20,8 @@ export interface DentalChartCircularProps {
 }
 
 /**
- * Circular/oval dental chart: teeth as circles along an ellipse,
- * permanent/deciduous toggle, hover tooltip with Arabic anatomical name.
+ * Dental chart with detailed SVG tooth shapes (mouth view).
+ * Uses treatment-based coloring, permanent/deciduous toggle, hover tooltip, and jaw-only legend.
  */
 export default function DentalChartCircular({
   treatments,
@@ -42,15 +36,9 @@ export default function DentalChartCircular({
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const teethOrder = chartMode === 'permanent' ? PERMANENT_ORDER : DECIDUOUS_ORDER;
-  const positions = useMemo(
-    () =>
-      getCircularToothPositions(teethOrder, {
-        width: OVAL_VIEWBOX_WIDTH,
-        height: OVAL_VIEWBOX_HEIGHT,
-        padding: OVAL_PADDING,
-      }),
-    [teethOrder]
+  const allTeeth = useMemo(
+    () => (chartMode === 'deciduous' ? [...permanentTeethData, ...primaryTeethData] : permanentTeethData),
+    [chartMode]
   );
 
   const handleToothMouseEnter = useCallback(
@@ -105,63 +93,138 @@ export default function DentalChartCircular({
       </div>
 
       <div className="bg-card rounded-xl border border-border p-4 overflow-x-auto relative">
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${OVAL_VIEWBOX_WIDTH} ${OVAL_VIEWBOX_HEIGHT}`}
-          className="w-full max-w-2xl mx-auto block"
-          style={{ aspectRatio: `${OVAL_VIEWBOX_WIDTH} / ${OVAL_VIEWBOX_HEIGHT}` }}
-          aria-label="مخطط الأسنان"
-        >
-          {/* Teeth — numbers stay upright (no rotation); no connector lines per design */}
-          {positions.map(({ fdi, x, y }) => {
-            const colorClass = getToothColor(fdi);
-            const isHighlight = highlightTooth === fdi;
-            const nameAr = getToothNameAr(fdi);
-
-            return (
-              <g
-                key={fdi}
-                role="button"
-                tabIndex={0}
-                className={cn(
-                  'cursor-pointer outline-none',
-                  onToothClick && 'hover:opacity-90'
-                )}
-                onClick={() => onToothClick?.(fdi)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ')
-                    onToothClick?.(fdi);
-                }}
-                onMouseEnter={(e) => handleToothMouseEnter(fdi, x, y, e)}
-                onMouseLeave={handleToothMouseLeave}
-                aria-label={nameAr}
+        <div className={cn(styles.chartContainer, 'max-w-full')}>
+          <svg
+            ref={svgRef}
+            width={CHART_VIEWBOX_WIDTH}
+            height={CHART_VIEWBOX_HEIGHT}
+            viewBox={`0 0 ${CHART_VIEWBOX_WIDTH} ${CHART_VIEWBOX_HEIGHT}`}
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className={cn(styles.dentalChart, 'w-full max-w-[400px] mx-auto block')}
+            style={{ aspectRatio: `${CHART_VIEWBOX_WIDTH} / ${CHART_VIEWBOX_HEIGHT}` }}
+            aria-label="مخطط الأسنان"
+          >
+            <defs>
+              <linearGradient
+                id="paint0_linear_2930_16212"
+                x1="169.2"
+                y1="140"
+                x2="168.7"
+                y2="390"
+                gradientUnits="userSpaceOnUse"
               >
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={TOOTH_RADIUS}
-                  className={cn(
-                    'fill-white stroke-slate-200',
-                    colorClass
-                  )}
-                  strokeWidth={isHighlight ? 2.5 : 1}
-                />
-                <text
-                  x={x}
-                  y={y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  className="text-sm font-semibold fill-slate-700 pointer-events-none"
-                  style={{ transform: 'none' }}
-                >
-                  {fdi}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+                <stop offset="0" stopOpacity="0" />
+                <stop offset="0.515" stopColor="#222222" />
+                <stop offset="1" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient
+                id="paint1_linear_2930_16212"
+                x1="269.335"
+                y1="263.5"
+                x2="66.6323"
+                y2="263.171"
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop offset="0" stopOpacity="0" />
+                <stop offset="0.515" stopColor="#222222" />
+                <stop offset="1" stopOpacity="0" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-        {/* Custom tooltip: positioned above hovered tooth so it always shows */}
+            {/* Chart dividers */}
+            <path
+              d="M168 140 L168 390"
+              stroke="url(#paint0_linear_2930_16212)"
+              strokeWidth="1"
+            />
+            <path
+              d="M68 263 L332 263"
+              stroke="url(#paint1_linear_2930_16212)"
+              strokeWidth="1"
+            />
+
+            {/* Teeth */}
+            {allTeeth.map((tooth) => {
+              const fdi = parseInt(tooth.number, 10);
+              const isHighlight = highlightTooth === fdi;
+              const isPrimary = tooth.isPrimary === true;
+              const colorClass = getToothColor(fdi);
+
+              return (
+                <g
+                  key={tooth.number}
+                  id={`tooth-${tooth.number}`}
+                  data-tooth={tooth.number}
+                  role="button"
+                  tabIndex={0}
+                  className={cn(
+                    styles.toothGroup,
+                    isPrimary && styles.primaryTooth,
+                    isHighlight && styles.highlighted
+                  )}
+                  onClick={() => onToothClick?.(fdi)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') onToothClick?.(fdi);
+                  }}
+                  onMouseEnter={(e) => handleToothMouseEnter(fdi, tooth.textX, tooth.textY, e)}
+                  onMouseLeave={handleToothMouseLeave}
+                  aria-label={getToothNameAr(fdi)}
+                >
+                  {tooth.paths.map((path, index) => {
+                    const isMainShape = !path.isDetail && !path.isOutline;
+                    const pathStrokeWidth =
+                      path.strokeWidth != null
+                        ? path.strokeWidth
+                        : isHighlight && isMainShape
+                          ? 2.5
+                          : 1.5;
+                    /* Main shape: fill/stroke from getToothColor (className). Outline/detail: use path data. */
+                    const fill = isMainShape ? undefined : path.fill;
+                    const stroke = isMainShape ? undefined : path.stroke;
+
+                    return (
+                      <path
+                        key={`${tooth.number}-${index}`}
+                        d={path.d}
+                        fill={fill}
+                        fillOpacity={1}
+                        stroke={stroke}
+                        strokeWidth={pathStrokeWidth}
+                        opacity={1}
+                        className={cn(
+                          styles.toothPath,
+                          isMainShape && colorClass
+                        )}
+                      />
+                    );
+                  })}
+                  <text
+                    x={tooth.textX}
+                    y={tooth.textY}
+                    fill={isPrimary ? '#9ca3af' : '#64748b'}
+                    fontSize={isPrimary ? 10 : 12}
+                    fontWeight={isHighlight ? 600 : 'normal'}
+                    fontFamily="Cairo, Arial, sans-serif"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className={styles.toothText}
+                  >
+                    {tooth.number}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
         {hoveredTooth != null &&
           createPortal(
             <div
