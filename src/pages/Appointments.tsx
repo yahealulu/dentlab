@@ -555,6 +555,35 @@ export default function AppointmentsPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>حجز موعد</DialogTitle></DialogHeader>
           <div className="space-y-4">
+            {/* Patient — first field */}
+            <div>
+              <Label className="mb-2 block">المريض</Label>
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-lg mb-2">
+                <button onClick={() => setPatientMode('existing')} className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium ${patientMode === 'existing' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>مريض مسجل</button>
+                <button onClick={() => setPatientMode('new')} className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium ${patientMode === 'new' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>مريض جديد</button>
+              </div>
+              {patientMode === 'existing' ? (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input value={searchPatient} onChange={e => setSearchPatient(e.target.value)} placeholder="بحث بالاسم أو الرقم..." className="pr-10" />
+                  </div>
+                  {searchPatient && (
+                    <div className="border border-border rounded-lg max-h-40 overflow-y-auto">
+                      {filteredPatients.map(p => (
+                        <button key={p.id} onClick={() => { setForm({ ...form, patientId: p.id }); setSearchPatient(p.fullName); }}
+                          className={`w-full text-start px-3 py-2 text-sm hover:bg-muted/50 ${form.patientId === p.id ? 'bg-accent' : ''}`}>
+                          {p.fullName} - {p.phone}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Input value={form.tempPatientName} onChange={e => setForm({ ...form, tempPatientName: e.target.value })} placeholder="اسم المريض المؤقت" />
+              )}
+            </div>
+
             <div>
               <Label>نوع العلاج</Label>
               <Select value={form.treatmentType} onValueChange={v => setForm({ ...form, treatmentType: v })}>
@@ -593,33 +622,6 @@ export default function AppointmentsPage() {
               </div>
             </div>
             {conflictError && <p className="text-sm text-destructive">{conflictError}</p>}
-
-            {/* Patient Mode */}
-            <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
-              <button onClick={() => setPatientMode('existing')} className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium ${patientMode === 'existing' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>مريض مسجل</button>
-              <button onClick={() => setPatientMode('new')} className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium ${patientMode === 'new' ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>مريض جديد</button>
-            </div>
-
-            {patientMode === 'existing' ? (
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input value={searchPatient} onChange={e => setSearchPatient(e.target.value)} placeholder="بحث بالاسم أو الرقم..." className="pr-10" />
-                </div>
-                {searchPatient && (
-                  <div className="border border-border rounded-lg max-h-40 overflow-y-auto">
-                    {filteredPatients.map(p => (
-                      <button key={p.id} onClick={() => { setForm({ ...form, patientId: p.id }); setSearchPatient(p.fullName); }}
-                        className={`w-full text-start px-3 py-2 text-sm hover:bg-muted/50 ${form.patientId === p.id ? 'bg-accent' : ''}`}>
-                        {p.fullName} - {p.phone}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div><Label>اسم المريض</Label><Input value={form.tempPatientName} onChange={e => setForm({ ...form, tempPatientName: e.target.value })} placeholder="اسم المريض المؤقت" /></div>
-            )}
 
             <Button onClick={handleBook} className="w-full">حجز الموعد</Button>
           </div>
