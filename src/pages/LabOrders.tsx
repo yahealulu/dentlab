@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { getStore, setStore, generateId, getNextOrderNo, STORAGE_KEYS } from '@/lib/storage';
 import type { LabOrder, Lab, LabWorkType, Patient } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -9,11 +9,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
-import { Plus, MessageSquare, Search } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, MessageSquare, Search, Calendar } from 'lucide-react';
+import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, getDaysInMonth, parseISO, isWithinInterval } from 'date-fns';
 
 const statusLabels: Record<string, string> = { pending: 'قيد الانتظار', received: 'تم الاستلام', cancelled: 'ملغي' };
 const statusColors: Record<string, string> = { pending: 'bg-warning text-warning-foreground', received: 'bg-success text-success-foreground', cancelled: 'bg-destructive text-destructive-foreground' };
+
+type DateFilterMode = 'all' | 'today' | 'last7' | 'last30' | 'day' | 'month' | 'year';
+
+const now = new Date();
+const currentYear = now.getFullYear();
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+function getOrderDate(order: LabOrder): Date {
+  const dateStr = order.sentDate || order.createdAt;
+  if (order.sentDate && /^\d{4}-\d{2}-\d{2}$/.test(order.sentDate)) {
+    return startOfDay(parseISO(order.sentDate));
+  }
+  return parseISO(order.createdAt);
+}
 
 export default function LabOrders() {
   const [orders, setOrders] = useState<LabOrder[]>(() => getStore(STORAGE_KEYS.labOrders, []));
@@ -26,6 +40,14 @@ export default function LabOrders() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [cost, setCost] = useState(0);
   const [searchP, setSearchP] = useState('');
+
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('all');
+  const [filterDay, setFilterDay] = useState(now.getDate());
+  const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
+  const [filterYear, setFilterYear] = useState(currentYear);
+
+  const daysInFilterMonth = getDaysInMonth(new Date(filterYear, filterMonth - 1));
+  const safeFilterDay = Math.min(filterDay, daysInFilterMonth);
 
   const [form, setForm] = useState({
     patientId: '', labId: '', workTypeId: '', quantity: 1,
@@ -63,6 +85,60 @@ export default function LabOrders() {
   const getPatientName = (id: string) => patients.find(p => p.id === id)?.fullName || '-';
   const getLabName = (id: string) => labs.find(l => l.id === id)?.name || getStore<Lab[]>(STORAGE_KEYS.labs, []).find(l => l.id === id)?.name || '-';
   const getWorkTypeName = (id: string) => workTypes.find(w => w.id === id)?.name || '-';
+
+  const filteredOrders = useMemo(() => {
+    const sorted = [...orders].sort((a, b) => b.orderNo - a.orderNo);
+    if (dateFilterMode === 'all') return sorted;
+
+    const today = startOfDay(now);
+    const endToday = endOfDay(now);
+
+    if (dateFilterMode === 'today') {
+      return sorted.filter(o => {
+        const d = getOrderDate(o);
+        return isWithinInterval(d, { start: today, end: endToday });
+      });
+    }
+    if (dateFilterMode === 'last7') {
+      const start = startOfDay(subDays(now, 6));
+      return sorted.filter(o => {
+        const d = getOrderDate(o);
+        return isWithinInterval(d, { start, end: endToday });
+      });
+    }
+    if (dateFilterMode === 'last30') {
+      const start = startOfDay(subDays(now, 29));
+      return sorted.filter(o => {
+        const d = getOrderDate(o);
+        return isWithinInterval(d, { start, end: endToday });
+      });
+    }
+    if (dateFilterMode === 'day') {
+      const targetStart = startOfDay(new Date(filterYear, filterMonth - 1, safeFilterDay));
+      const targetEnd = endOfDay(targetStart);
+      return sorted.filter(o => {
+        const d = getOrderDate(o);
+        return isWithinInterval(d, { start: targetStart, end: targetEnd });
+      });
+    }
+    if (dateFilterMode === 'month') {
+      const start = startOfMonth(new Date(filterYear, filterMonth - 1));
+      const end = endOfMonth(start);
+      return sorted.filter(o => {
+        const d = getOrderDate(o);
+        return isWithinInterval(d, { start, end });
+      });
+    }
+    if (dateFilterMode === 'year') {
+      const start = startOfYear(new Date(filterYear, 0));
+      const end = endOfYear(start);
+      return sorted.filter(o => {
+        const d = getOrderDate(o);
+        return isWithinInterval(d, { start, end });
+      });
+    }
+    return sorted;
+  }, [orders, dateFilterMode, filterDay, filterMonth, filterYear, safeFilterDay]);
 
   const filteredPatients = patients.filter(p => p.fullName.includes(searchP) || p.phone.includes(searchP)).slice(0, 8);
 
@@ -115,6 +191,88 @@ export default function LabOrders() {
         </Dialog>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Calendar className="w-4 h-4" />
+          <span className="text-sm font-medium">تصفية حسب التاريخ:</span>
+        </div>
+        <Select value={dateFilterMode} onValueChange={(v) => setDateFilterMode(v as DateFilterMode)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">الكل</SelectItem>
+            <SelectItem value="today">اليوم</SelectItem>
+            <SelectItem value="last7">آخر 7 أيام</SelectItem>
+            <SelectItem value="last30">آخر 30 يوم</SelectItem>
+            <SelectItem value="day">يوم محدد</SelectItem>
+            <SelectItem value="month">شهر محدد</SelectItem>
+            <SelectItem value="year">سنة محددة</SelectItem>
+          </SelectContent>
+        </Select>
+        {dateFilterMode === 'day' && (
+          <div className="flex items-center gap-2">
+            <Select value={String(safeFilterDay)} onValueChange={(v) => setFilterDay(Number(v))}>
+              <SelectTrigger className="w-[80px]"><SelectValue placeholder="اليوم" /></SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: daysInFilterMonth }, (_, i) => i + 1).map((d) => (
+                  <SelectItem key={d} value={String(d)}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(filterMonth)} onValueChange={(v) => setFilterMonth(Number(v))}>
+              <SelectTrigger className="w-[130px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
+              <SelectContent>
+                {MONTHS_AR.map((name, i) => (
+                  <SelectItem key={i} value={String(i + 1)}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(filterYear)} onValueChange={(v) => setFilterYear(Number(v))}>
+              <SelectTrigger className="w-[100px]"><SelectValue placeholder="السنة" /></SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 6 }, (_, i) => currentYear - i).map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {dateFilterMode === 'month' && (
+          <div className="flex items-center gap-2">
+            <Select value={String(filterMonth)} onValueChange={(v) => setFilterMonth(Number(v))}>
+              <SelectTrigger className="w-[130px]"><SelectValue placeholder="الشهر" /></SelectTrigger>
+              <SelectContent>
+                {MONTHS_AR.map((name, i) => (
+                  <SelectItem key={i} value={String(i + 1)}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(filterYear)} onValueChange={(v) => setFilterYear(Number(v))}>
+              <SelectTrigger className="w-[100px]"><SelectValue placeholder="السنة" /></SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 6 }, (_, i) => currentYear - i).map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {dateFilterMode === 'year' && (
+          <Select value={String(filterYear)} onValueChange={(v) => setFilterYear(Number(v))}>
+            <SelectTrigger className="w-[120px]"><SelectValue placeholder="السنة" /></SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 6 }, (_, i) => currentYear - i).map((y) => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <span className="text-sm text-muted-foreground ms-auto">
+          النتيجة: {filteredOrders.length} طلب
+        </span>
+      </div>
+
       <div className="bg-card rounded-xl border border-border overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
@@ -130,9 +288,9 @@ export default function LabOrders() {
             </tr>
           </thead>
           <tbody>
-            {orders.length === 0 ? (
-              <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">لا توجد طلبات</td></tr>
-            ) : orders.sort((a, b) => b.orderNo - a.orderNo).map(o => (
+            {filteredOrders.length === 0 ? (
+              <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">لا توجد طلبات في الفترة المحددة</td></tr>
+            ) : filteredOrders.map(o => (
               <tr key={o.id} className="border-b border-border hover:bg-muted/30">
                 <td className="p-3">{o.orderNo}</td>
                 <td className="p-3 font-medium">{getPatientName(o.patientId)}</td>
