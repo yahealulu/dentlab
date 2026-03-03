@@ -7,6 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -115,6 +125,7 @@ export default function AppointmentsPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [editForm, setEditForm] = useState({ date: '', time: '', duration: 30 });
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
 
   const save = useCallback((a: Appointment[]) => {
     setAppointments(a);
@@ -267,8 +278,11 @@ export default function AppointmentsPage() {
       a.id === appointmentId ? { ...a, status: 'cancelled' as const } : a
     );
     save(updated);
+    setCancelConfirmId(null);
     toast.success('تم إلغاء الموعد');
   };
+
+  const openCancelConfirm = (appointmentId: string) => setCancelConfirmId(appointmentId);
 
   const filteredPatients = patients.filter(p =>
     p.fullName.includes(searchPatient) || p.phone.includes(searchPatient)
@@ -500,7 +514,7 @@ export default function AppointmentsPage() {
                           </Button>
                         )}
                         {canCancel(apt.status) && (
-                          <Button size="sm" variant="outline" className="text-destructive border-destructive/50 hover:bg-destructive/10" onClick={() => handleCancel(apt.id)}>
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/50 hover:bg-destructive/10" onClick={() => openCancelConfirm(apt.id)}>
                             <XCircle className="w-4 h-4 ms-1" />
                             إلغاء
                           </Button>
@@ -514,6 +528,27 @@ export default function AppointmentsPage() {
           </table>
         </div>
       </div>
+
+      {/* Confirm cancel appointment */}
+      <AlertDialog open={cancelConfirmId !== null} onOpenChange={(open) => !open && setCancelConfirmId(null)}>
+        <AlertDialogContent className="max-w-md text-right">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد إلغاء الموعد</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من إلغاء هذا الموعد؟ سيتم تغيير الحالة إلى «ملغي» ويمكنك إعادة الحجز لاحقاً إن رغبت.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 sm:justify-start">
+            <AlertDialogCancel>تراجع</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => cancelConfirmId && handleCancel(cancelConfirmId)}
+            >
+              نعم، إلغاء الموعد
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Booking Modal */}
       <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
