@@ -69,7 +69,7 @@ export interface Appointment {
   patientId: string | null;
   tempPatientName: string | null;
   treatmentType: string;
-  status: 'scheduled' | 'waiting' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'waiting' | 'completed' | 'cancelled';
   notes: string;
 }
 

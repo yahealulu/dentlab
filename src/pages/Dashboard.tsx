@@ -13,18 +13,16 @@ import { toast } from 'sonner';
 const statusMap: Record<string, { label: string; class: string }> = {
   scheduled: { label: 'مجدول', class: 'bg-info text-info-foreground' },
   waiting: { label: 'قائمة انتظار', class: 'bg-warning text-warning-foreground' },
-  in_progress: { label: 'جاري العمل', class: 'bg-primary text-primary-foreground' },
   completed: { label: 'مكتمل', class: 'bg-success text-success-foreground' },
   cancelled: { label: 'ملغي', class: 'bg-destructive text-destructive-foreground' },
 };
 
 const nextStatus: Record<string, string> = {
   scheduled: 'waiting',
-  waiting: 'in_progress',
-  in_progress: 'completed',
+  waiting: 'completed',
 };
 
-/** Cancel allowed only for scheduled and waiting — not for in_progress, completed, or cancelled */
+/** Cancel allowed only for scheduled and waiting — not for completed or cancelled */
 const canCancel = (status: string) => status === 'scheduled' || status === 'waiting';
 
 function formatTimeRange(time: string, durationMinutes: number): string {
@@ -39,7 +37,10 @@ function formatTimeRange(time: string, durationMinutes: number): string {
 export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [filterDoctor, setFilterDoctor] = useState('all');
-  const [appointments, setAppointments] = useState<Appointment[]>(() => getStore<Appointment[]>(STORAGE_KEYS.appointments, []));
+  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    const raw = getStore<Appointment[]>(STORAGE_KEYS.appointments, []);
+    return raw.map(a => (a as Appointment & { status: string }).status === 'in_progress' ? { ...a, status: 'completed' as const } : a);
+  });
 
   const patients = getStore<Patient[]>(STORAGE_KEYS.patients, []);
   const doctors = getStore<Doctor[]>(STORAGE_KEYS.doctors, []);

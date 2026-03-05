@@ -42,23 +42,21 @@ function snapTimeToQuarter(time: string): string {
 }
 
 const statusColors: Record<string, string> = {
-  scheduled: 'bg-info/80', waiting: 'bg-warning/80', in_progress: 'bg-primary/80', completed: 'bg-success/80', cancelled: 'bg-destructive/30',
+  scheduled: 'bg-info/80', waiting: 'bg-warning/80', completed: 'bg-success/80', cancelled: 'bg-destructive/30',
 };
 const statusLabels: Record<string, string> = {
-  scheduled: 'مجدول', waiting: 'انتظار', in_progress: 'جاري', completed: 'مكتمل', cancelled: 'ملغي',
+  scheduled: 'مجدول', waiting: 'انتظار', completed: 'مكتمل', cancelled: 'ملغي',
 };
 
 const statusMap: Record<string, { label: string; class: string }> = {
   scheduled: { label: 'مجدول', class: 'bg-info text-info-foreground' },
   waiting: { label: 'قائمة انتظار', class: 'bg-warning text-warning-foreground' },
-  in_progress: { label: 'جاري العمل', class: 'bg-primary text-primary-foreground' },
   completed: { label: 'مكتمل', class: 'bg-success text-success-foreground' },
   cancelled: { label: 'ملغي', class: 'bg-destructive text-destructive-foreground' },
 };
 const nextStatus: Record<string, string> = {
   scheduled: 'waiting',
-  waiting: 'in_progress',
-  in_progress: 'completed',
+  waiting: 'completed',
 };
 const canCancel = (status: string) => status === 'scheduled' || status === 'waiting';
 
@@ -102,21 +100,29 @@ function getConflictingAppointment(
 
 export default function AppointmentsPage() {
   const settings = getStore<ClinicSettings>(STORAGE_KEYS.clinicSettings, { workDays: [0,1,2,3,4], startTime: '09:00', endTime: '17:00', shifts: [{ id: 'default', startTime: '09:00', endTime: '17:00' }], holidays: [], logo: null, tags: [], slotDuration: 30 });
-  const [appointments, setAppointments] = useState<Appointment[]>(() => getStore(STORAGE_KEYS.appointments, []));
+  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    const raw = getStore<Appointment[]>(STORAGE_KEYS.appointments, []);
+    return raw.map(a => (a as Appointment & { status: string }).status === 'in_progress' ? { ...a, status: 'completed' as const } : a);
+  });
+
+  const normalizeAppointments = useCallback((raw: Appointment[]) => {
+    return raw.map(a => (a as Appointment & { status: string }).status === 'in_progress' ? { ...a, status: 'completed' as const } : a);
+  }, []);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEYS.appointments && e.newValue) {
         try {
-          setAppointments(JSON.parse(e.newValue));
+          const raw = JSON.parse(e.newValue) as Appointment[];
+          setAppointments(normalizeAppointments(raw));
         } catch {
-          setAppointments(getStore(STORAGE_KEYS.appointments, []));
+          setAppointments(normalizeAppointments(getStore<Appointment[]>(STORAGE_KEYS.appointments, [])));
         }
       }
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, []);
+  }, [normalizeAppointments]);
 
   const doctors = getStore<Doctor[]>(STORAGE_KEYS.doctors, []);
   const activeDoctors = useMemo(() => doctors.filter(d => d.isActive !== false), [doctors]);
