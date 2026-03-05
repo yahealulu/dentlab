@@ -3,6 +3,16 @@ import { Link } from 'react-router-dom';
 import { getStore, setStore, STORAGE_KEYS } from '@/lib/storage';
 import type { Appointment, Patient, Doctor, Expense, LabOrder } from '@/types';
 import { Calendar, Users, DollarSign, FlaskConical, ChevronLeft, ChevronRight, Filter, XCircle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +47,7 @@ function formatTimeRange(time: string, durationMinutes: number): string {
 export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [filterDoctor, setFilterDoctor] = useState('all');
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     const raw = getStore<Appointment[]>(STORAGE_KEYS.appointments, []);
     return raw.map(a => (a as Appointment & { status: string }).status === 'in_progress' ? { ...a, status: 'completed' as const } : a);
@@ -104,6 +115,7 @@ export default function Dashboard() {
   };
 
   const handleCancel = (appointmentId: string) => {
+    setCancelConfirmId(null);
     setAppointments(prev => {
       const updated = prev.map(a =>
         a.id === appointmentId ? { ...a, status: 'cancelled' as const } : a
@@ -222,7 +234,7 @@ export default function Dashboard() {
                           </Button>
                         )}
                         {canCancel(apt.status) && (
-                          <Button size="sm" variant="outline" className="text-destructive border-destructive/50 hover:bg-destructive/10" onClick={() => handleCancel(apt.id)}>
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/50 hover:bg-destructive/10" onClick={() => setCancelConfirmId(apt.id)}>
                             <XCircle className="w-4 h-4 ms-1" />
                             إلغاء
                           </Button>
@@ -236,6 +248,27 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Confirm cancel appointment */}
+      <AlertDialog open={cancelConfirmId !== null} onOpenChange={(open) => !open && setCancelConfirmId(null)}>
+        <AlertDialogContent className="max-w-md text-right">
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد إلغاء الموعد</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من إلغاء هذا الموعد؟ سيتم تغيير الحالة إلى «ملغي» ويمكنك إعادة الحجز لاحقاً إن رغبت.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 sm:justify-start">
+            <AlertDialogCancel>تراجع</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => cancelConfirmId && handleCancel(cancelConfirmId)}
+            >
+              نعم، إلغاء الموعد
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
